@@ -67,11 +67,17 @@ def parse_scan(payload):
                       "timed_out": host.get("timedout") == "true",
                       "port_summary": [item.attrib for item in host.findall("ports/extraports")]})
         for port in host.findall("ports/port"):
+            try:
+                port_number = int(port.get("portid", ""))
+                if not 1 <= port_number <= 65535:
+                    raise ValueError()
+            except ValueError:
+                raise ValidationError("Nmap returned an invalid port number.") from None
             service = port.find("service")
             state = port.find("state")
             attrs = service.attrib if service is not None else {}
             scripts = [{"id": item.get("id"), "output": item.get("output", "")} for item in port.findall("script")]
-            records.append({"ip": address, "port": int(port.get("portid")), "protocol": port.get("protocol"),
+            records.append({"ip": address, "port": port_number, "protocol": port.get("protocol"),
                             "state": state.get("state", "unknown") if state is not None else "unknown",
                             "service": attrs.get("name", "unknown"), "product": attrs.get("product", ""),
                             "version": attrs.get("version", ""), "extra_info": attrs.get("extrainfo", ""),

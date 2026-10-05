@@ -45,6 +45,6 @@ class Config:
                 config.endpoints.update(data.get("endpoints", {}))
                 config.cache_seconds = max(60, int(data.get("cache_seconds", 3600)))
                 config.timeout_seconds = min(60, max(5, int(data.get("timeout_seconds", 20))))
-            except (ValueError, TypeError) as exc:
+            except (ValueError, TypeError, OverflowError) as exc:
                 raise ValidationError(f"Invalid configuration in {file}: {exc}") from None
         return config

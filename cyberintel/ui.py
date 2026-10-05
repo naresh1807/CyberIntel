@@ -701,6 +701,8 @@ class MainWindow(QMainWindow):
                 result = analyze_pcap(evidence["path"], data_kind=evidence["data_kind"])
             else:
                 result = analyze_geo(evidence["path"], mode, evidence["data_kind"])
+            if result.data["file_sha256"] != evidence["sha256"] or sha256(evidence["path"]) != evidence["sha256"]:
+                raise ValidationError("Evidence changed during analysis. Results were not saved.")
             result.reference = "evidence:" + evidence["id"]
             result.query = evidence["name"]
             result.data["evidence_source"] = evidence["source"]

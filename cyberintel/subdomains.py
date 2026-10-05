@@ -64,7 +64,7 @@ def _resolve_record(row, resolver_factory):
             break
         except dns.resolver.NoAnswer:
             row[field + "_status"] = "no record"
-        except dns.exception.DNSException as exc:
+        except (dns.exception.DNSException, OSError) as exc:
             row[field + "_status"] = "lookup failed"
             errors.append(record_type + ": " + type(exc).__name__)
     row["dns_status"] = "resolved" if row["ipv4"] or row["ipv6"] else "nxdomain" if nxdomain else "error" if errors else "no address records"

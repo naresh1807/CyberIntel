@@ -67,6 +67,7 @@ class Store:
     def open_workspace(self):
         """Open the single-user desktop without creating or authenticating accounts."""
         with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
             self._audit(db, "local-workspace", "workspace_opened", "Direct desktop session started")
         return LocalSession(self, "local-workspace", "admin")
 
@@ -193,7 +194,10 @@ class Session:
             raise ValidationError("Evidence limit is 200 MiB.")
         if not source.strip():
             raise ValidationError("Evidence source is required.")
-        date = datetime.fromisoformat(acquired_at.replace("Z", "+00:00"))
+        try:
+            date = datetime.fromisoformat(acquired_at.replace("Z", "+00:00"))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError("Acquisition time must be a valid timestamp with a timezone.") from None
         if date.tzinfo is None:
             raise ValidationError("Acquisition time must include a timezone.")
         if data_kind not in {"actual", "inferred", "synthetic"}:
@@ -260,6 +264,8 @@ class Session:
         target = (email if kind == "email" else domain)(target)
         with self.store.connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
+                raise ValidationError("Select an existing case.")
             if db.execute("SELECT 1 FROM watchlist WHERE case_id=? AND kind=? AND target=?", (case_id, kind, target)).fetchone():
                 raise ValidationError("This exposure watch already exists in the case.")
             if db.execute("SELECT COUNT(*) FROM watchlist WHERE case_id=?", (case_id,)).fetchone()[0] >= 25:

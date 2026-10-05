@@ -40,6 +40,8 @@ def read_table(path):
         with path.open(encoding="utf-8-sig", newline="") as file:
             header = next(csv.reader(file), [])
         normalized = [name.strip().lower() for name in header]
+        if not normalized or any(not name for name in normalized):
+            raise ValidationError("Every table column needs a nonempty name.")
         if len(set(normalized)) != len(normalized):
             raise ValidationError("Duplicate column names after normalization.")
         frame = pd.read_csv(path, dtype=str, keep_default_na=False, nrows=MAX_ROWS + 1)
@@ -54,6 +56,8 @@ def read_table(path):
         try:
             header = next(workbook.worksheets[0].iter_rows(min_row=1, max_row=1, values_only=True), ())
             normalized = [str(name).strip().lower() for name in header]
+            if not normalized or any(name is None or not str(name).strip() for name in header):
+                raise ValidationError("Every table column needs a nonempty name.")
             if len(set(normalized)) != len(normalized):
                 raise ValidationError("Duplicate column names after normalization.")
         finally:
@@ -183,7 +187,7 @@ def analyze_geo(path, mode="gps", data_kind="actual"):
         if data_kind == "synthetic":
             frame["record_kind"] = "synthetic"
         elif data_kind == "inferred":
-            frame["record_kind"] = "inferred"
+            frame.loc[frame["record_kind"] != "synthetic", "record_kind"] = "inferred"
     else:
         if not frame["tower_id"].str.strip().astype(bool).all():
             raise ValidationError("Every tower row needs a tower_id.")
@@ -248,19 +252,27 @@ def analyze_pcap(path, tshark="tshark", data_kind="actual"):
                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except subprocess.TimeoutExpired:
             raise ValidationError("TShark exceeded the 120-second limit; use a smaller capture.") from None
+        except OSError:
+            raise ValidationError("Unable to launch TShark. Check its installation.") from None
         if completed.returncode:
             raise ValidationError("TShark could not parse the capture. Verify the file with Wireshark.")
         output.seek(0)
         import io
         for row in csv.reader(io.TextIOWrapper(output, encoding="utf-8", errors="replace")):
             if len(row) != len(fields):
-                continue
+                raise ValidationError("TShark returned malformed packet fields; analysis refused.")
             packets += 1
             if packets > 500000:
                 raise ValidationError("Capture exceeds 500,000 packets; split it with editcap first.")
-            total_bytes += int(row[2] or 0)
+            try:
+                packet_bytes = int(row[2])
+                epoch = float(row[1])
+                if packet_bytes < 0 or not math.isfinite(epoch):
+                    raise ValueError()
+            except ValueError:
+                raise ValidationError("TShark returned invalid packet length or timestamp; analysis refused.") from None
+            total_bytes += packet_bytes
             protocols[row[3]] += 1
-            epoch = float(row[1])
             start = epoch if start is None else min(start, epoch)
             end = epoch if end is None else max(end, epoch)
             source, destination = row[4] or row[5], row[6] or row[7]

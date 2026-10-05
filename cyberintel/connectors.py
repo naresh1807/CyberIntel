@@ -19,8 +19,11 @@ from .models import Result, ValidationError
 
 
 def domain(value):
-    value = value.strip().rstrip(".").encode("idna").decode().lower()
-    if len(value) > 253 or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", value):
+    try:
+        value = value.strip().rstrip(".").encode("idna").decode().lower()
+    except UnicodeError:
+        raise ValidationError("Enter a valid fully qualified domain, without a URL or path.") from None
+    if len(value) > 253 or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})", value):
         raise ValidationError("Enter a valid fully qualified domain, without a URL or path.")
     return value
 
@@ -29,8 +32,12 @@ def indicator(value):
     value = value.strip()
     if value.startswith(("http://", "https://")):
         parts = urlsplit(value)
-        if not parts.hostname or parts.username or parts.password or len(value) > 2048:
+        if not parts.hostname or parts.username or parts.password or len(value) > 2048 or any(c.isspace() or ord(c) < 32 for c in value):
             raise ValidationError("Invalid indicator URL.")
+        try:
+            parts.port
+        except ValueError:
+            raise ValidationError("Invalid indicator URL port.") from None
         try:
             ipaddress.ip_address(parts.hostname)
         except ValueError:
@@ -123,8 +130,6 @@ class Collector:
                                            extensions={"sni_hostname": host}) as response:
                             status = response.status_code
                             if status in (429, 500, 502, 503, 504):
-                                if attempt == attempts - 1:
-                                    raise RuntimeError(f"Source unavailable (HTTP {status}).")
                                 retry = response.headers.get("Retry-After", "")
                                 try:
                                     delay = float(retry)
@@ -132,7 +137,7 @@ class Collector:
                                     try:
                                         from email.utils import parsedate_to_datetime
                                         delay = (parsedate_to_datetime(retry) - datetime.now(timezone.utc)).total_seconds()
-                                    except (TypeError, ValueError):
+                                    except (TypeError, ValueError, OverflowError):
                                         delay = 2 ** attempt
                                 if not math.isfinite(delay) or delay < 0:
                                     delay = 2 ** attempt
@@ -140,6 +145,8 @@ class Collector:
                                     self._next_request[host] = max(self._next_request.get(host, 0), time.monotonic() + delay)
                                 if delay > 30:
                                     raise RuntimeError(f"Rate limited; retry after {int(delay)} seconds.")
+                                if attempt == attempts - 1:
+                                    raise RuntimeError(f"Source unavailable (HTTP {status}).")
                                 self.sleep(max(0, delay))
                                 continue
                             if status in (301, 302, 303, 307, 308):
@@ -160,7 +167,7 @@ class Collector:
                                 body.extend(chunk)
                                 if len(body) > 8 * 1024 * 1024:
                                     raise RuntimeError("Source response exceeded 8 MiB limit.")
-                            content_type = response.headers.get("content-type", "")
+                            content_type = response.headers.get("content-type", "").lower()
                             if "json" in content_type:
                                 payload = json.loads(body)
                             else:
@@ -184,14 +191,15 @@ class Collector:
         cached = self.store.cache_get(key)
         if cached:
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(cached.collected_at)).total_seconds()
-            if not force and age < self.config.cache_seconds:
+            if not force and 0 <= age < self.config.cache_seconds:
                 cached.status = "cached"
+                cached.freshness = "fresh"
                 return cached
         try:
             result = self._collect(source, target)
             self.store.cache_put(key, result)
             return result
-        except (RuntimeError, ValueError, socket.gaierror, dns.exception.DNSException, KeyError) as exc:
+        except (RuntimeError, ValueError, TypeError, OSError, dns.exception.DNSException, KeyError) as exc:
             if cached:
                 cached.status, cached.freshness, cached.error = "cached", "stale", str(exc)
                 return cached
@@ -234,7 +242,7 @@ class Collector:
             records, errors = {}, {}
             for record_type in ("A", "AAAA", "MX", "NS", "TXT", "SOA", "CAA"):
                 try:
-                    records[record_type] = [r.to_text() for r in resolver.resolve(host, record_type)]
+                    records[record_type] = [r.to_text() for r in resolver.resolve(host + ".", record_type, search=False)]
                 except dns.resolver.NoAnswer:
                     records[record_type] = []
                 except dns.exception.DNSException as exc:
@@ -301,7 +309,7 @@ class Collector:
                     warnings.append("Stopped at the five-page request limit.")
             if isinstance(data, str):
                 data = json.loads(data)
-            if not isinstance(data, list) or any(not isinstance(row, dict) or not isinstance(row.get("name_value", ""), str) for row in data):
+            if not isinstance(data, list) or any(not isinstance(row, dict) or not isinstance(row.get("name_value"), str) for row in data):
                 raise RuntimeError("Malformed certificate transparency response.")
             names = set()
             concrete, wildcards = set(), set()
@@ -323,7 +331,7 @@ class Collector:
         if source == "website":
             target = domain(target)
             data, ref, headers = self._request("GET", "https://" + target + "/")
-            if not isinstance(data, str) or "html" not in headers.get("content-type", ""):
+            if not isinstance(data, str) or "html" not in headers.get("content-type", "").lower():
                 raise RuntimeError("The website did not return HTML.")
             parser = MetadataParser()
             parser.feed(data)
@@ -362,6 +370,8 @@ class Collector:
                     raise RuntimeError("Malformed HIBP response.")
                 fields = {"Name", "Title", "Domain", "BreachDate", "AddedDate", "ModifiedDate", "PwnCount", "Description", "DataClasses", "IsVerified"}
                 data = [{k: v for k, v in row.items() if k in fields} for row in data]
+                if any(not isinstance(row.get("BreachDate", ""), str) for row in data):
+                    raise RuntimeError("Malformed HIBP breach date.")
                 data.sort(key=lambda row: row.get("BreachDate", ""))
             return Result("Have I Been Pwned", ref, target or "public breach catalog", data)
         if source == "otx":
@@ -370,9 +380,9 @@ class Collector:
                 raise RuntimeError("Configure an OTX API key.")
             url = self.endpoint(source) + "/indicators/" + kind + "/" + quote(target, safe="") + "/general"
             data, ref, _ = self._request("GET", url, headers={"X-OTX-API-KEY": self.keys["otx"]})
-            if not isinstance(data, dict) or not isinstance(data.get("pulse_info", {}), dict):
+            if not isinstance(data, dict) or not isinstance(data.get("pulse_info"), dict):
                 raise RuntimeError("Malformed OTX response.")
-            count = data.get("pulse_info", {}).get("count", 0)
+            count = data["pulse_info"].get("count")
             if not isinstance(count, int) or isinstance(count, bool) or count < 0:
                 raise RuntimeError("Malformed OTX pulse count.")
             return Result("AlienVault OTX", ref, target,
