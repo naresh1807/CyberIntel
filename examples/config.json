@@ -1,0 +1,11 @@
+{
+  "endpoints": {
+    "rdap": "https://rdap.org",
+    "ct": "https://crt.sh",
+    "hibp": "https://haveibeenpwned.com/api/v3",
+    "otx": "https://otx.alienvault.com/api/v1",
+    "urlhaus": "https://urlhaus-api.abuse.ch/v1"
+  },
+  "cache_seconds": 3600,
+  "timeout_seconds": 20
+}

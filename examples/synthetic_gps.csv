@@ -1,0 +1,4 @@
+latitude,longitude,timestamp,source,record_kind
+28.6139,77.2090,2026-10-01T09:00:00Z,Synthetic fixture - no person tracked,synthetic
+28.6200,77.2150,2026-10-01T10:00:00Z,Synthetic fixture - no person tracked,synthetic
+28.6250,77.2200,2026-10-01T11:00:00Z,Synthetic fixture - no person tracked,synthetic

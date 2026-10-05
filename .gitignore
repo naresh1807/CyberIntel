@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+*.sqlite*
+*.log
+vault.enc
+reports/
+.env
+artifacts/
+*.pyc
+.env.*
+

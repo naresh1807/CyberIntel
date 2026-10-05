@@ -1,0 +1,3 @@
+tower_id,latitude,longitude,source
+TEST-001,28.6139,77.2090,Synthetic tower inventory
+TEST-002,28.6300,77.2250,Synthetic tower inventory
