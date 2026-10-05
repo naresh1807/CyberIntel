@@ -1,5 +1,7 @@
 # CyberIntel Suite
 
+For step-by-step instructions, see the [User Manual](USER_MANUAL.md).
+
 A modular Python desktop application for public intelligence collection and authorized offline forensic analysis. The PySide6 interface uses a dark purple, blue and charcoal palette with case selection, sortable/filterable tables, background jobs and PyQtGraph charts. No fixture data is loaded into a user's workspace automatically.
 
 This is version **0.1.0**, a tested development release, not a claim of production certification. All pages invoke implemented services. Credential-dependent providers and external tools report errors when unavailable; they never substitute synthetic results.
