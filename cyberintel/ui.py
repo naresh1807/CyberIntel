@@ -149,6 +149,7 @@ class Job(QRunnable):
 
 
 class MainWindow(QMainWindow):
+    collection_progress = Signal(str, object)
     PAGE_NAMES = ["Overview", "Live OSINT", "Breach intelligence", "Threat intelligence", "CDR analysis", "Network forensics", "Geospatial", "Phone region estimate", "Cases & evidence", "Reports & audit", "Settings", "Subdomain discovery", "Nmap IP scan"]
 
     def __init__(self, config, session):
@@ -159,6 +160,7 @@ class MainWindow(QMainWindow):
         self.jobs = {}
         self.busy = False
         self.last_results = {}
+        self.collection_progress.connect(self.show_collection_progress)
         self.display_case = None
         self.setWindowTitle("CyberIntel Suite • Intelligence & Digital Forensics")
         self.resize(1440, 940)
@@ -438,6 +440,8 @@ class MainWindow(QMainWindow):
             self.session.check("collect")
             result = discover_subdomains(self.collector, value, force)
             if resolve_ips:
+                if result.data and result.data.get("records"):
+                    self.collection_progress.emit("subdomains", result)
                 result = enrich_subdomains(result)
             if case_id:
                 self.session.save_finding(case_id, "subdomains", result)
@@ -536,7 +540,13 @@ class MainWindow(QMainWindow):
         force = controls["force"].isChecked()
         def task():
             self.session.check("collect")
-            result = enrich_subdomains(discover_subdomains(self.collector, target, force)) if source == "ct" else self.collector.collect(source, target, force)
+            if source == "ct":
+                result = discover_subdomains(self.collector, target, force)
+                if result.data and result.data.get("records"):
+                    self.collection_progress.emit(key, result)
+                result = enrich_subdomains(result)
+            else:
+                result = self.collector.collect(source, target, force)
             if case_id:
                 self.session.save_finding(case_id, key, result)
             else:
@@ -560,6 +570,13 @@ class MainWindow(QMainWindow):
                 return [{"subdomain": name} for name in data["subdomains"]]
             return [{"field": k, "value": v} for k, v in data.items()]
         return []
+
+    @Slot(str, object)
+    def show_collection_progress(self, key, result):
+        if not self.busy:
+            return
+        self.show_result(key, result)
+        self.notice.setText("Subdomains found; IPv4/IPv6 checks are still running. Final results will be saved when complete.")
 
     def show_result(self, key, result):
         self.last_results[key] = result

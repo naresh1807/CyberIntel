@@ -89,7 +89,7 @@ def verify_subdomains(result, names, resolver_factory=None):
             raise ValidationError("A discovered name is outside the requested domain.")
     result = copy.deepcopy(result)
     resolver_factory = resolver_factory or dns.resolver.Resolver
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         checked = list(pool.map(lambda row: _resolve_record(row, resolver_factory), [known[name] for name in sorted(names)]))
     updates = {row["subdomain"]: row for row in checked}
     result.data["records"] = [updates.get(row["subdomain"], row) for row in result.data["records"]]

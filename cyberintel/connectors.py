@@ -90,7 +90,8 @@ class Collector:
         self._lock = threading.Lock()
         self._next_request = {}
 
-    def _request(self, method, url, headers=None, data=None, not_found_empty=False, empty_payload=None):
+    def _request(self, method, url, headers=None, data=None, not_found_empty=False, empty_payload=None,
+                 attempts=3, timeout_seconds=None):
         """Pin public address to prevent DNS rebinding; TLS still verifies original host."""
         original = url
         for redirect in range(5):
@@ -106,9 +107,9 @@ class Collector:
                 pinned = url  # deterministic injected test transport, never used by the UI
             request_headers = {"User-Agent": "CyberIntelSuite/0.1 (public intelligence)", "Host": host}
             request_headers.update(headers or {})
-            with httpx.Client(timeout=self.config.timeout_seconds, trust_env=False,
+            with httpx.Client(timeout=timeout_seconds or self.config.timeout_seconds, trust_env=False,
                               follow_redirects=False, transport=self.transport) as client:
-                for attempt in range(3):
+                for attempt in range(attempts):
                     with self._lock:
                         delay = self._next_request.get(host, 0) - time.monotonic()
                         if delay > 30:
@@ -121,7 +122,7 @@ class Collector:
                                            extensions={"sni_hostname": host}) as response:
                             status = response.status_code
                             if status in (429, 500, 502, 503, 504):
-                                if attempt == 2:
+                                if attempt == attempts - 1:
                                     raise RuntimeError(f"Source unavailable (HTTP {status}).")
                                 retry = response.headers.get("Retry-After", "")
                                 try:
@@ -165,7 +166,7 @@ class Collector:
                                 payload = body.decode("utf-8", errors="replace")
                             return payload, original, dict(response.headers)
                     except httpx.TransportError:
-                        if attempt == 2:
+                        if attempt == attempts - 1:
                             raise RuntimeError("Network or TLS connection failed.") from None
                         self.sleep(2 ** attempt)
                 else:
@@ -238,7 +239,8 @@ class Collector:
             truncated, warnings = False, []
             if source == "ct_primary":
                 url = self.endpoint("ct") + "/?q=" + quote("%." + target) + "&output=json"
-                data, ref, _ = self._request("GET", url)
+                data, ref, _ = self._request("GET", url, attempts=1,
+                                             timeout_seconds=min(8, self.config.timeout_seconds))
                 provider = "Certificate Transparency / crt.sh"
             else:
                 url = self.endpoint("certspotter") + "/issuances?domain=" + quote(target) + "&include_subdomains=true&expand=dns_names"
