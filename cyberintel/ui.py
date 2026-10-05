@@ -485,7 +485,7 @@ class MainWindow(QMainWindow):
         self.start_job("Exporting subdomains", task, lambda exported: self.notice.setText("Subdomains CSV written: " + exported))
 
     def build_phone_page(self):
-        layout = self.page("Estimate a number's country or allocation area using offline public prefix metadata.")
+        layout = self.page("Offline numbering-region estimates or authorized Twilio validation and carrier/type lookup.")
         description = QLabel("A phone number cannot reveal a phone's current location. Area/carrier labels describe numbering allocations; portability and roaming can make these associations inaccurate. Actual location analysis requires authorized GPS or tower records in Geospatial.")
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -500,7 +500,12 @@ class MainWindow(QMainWindow):
         row.addWidget(self.phone_region)
         row.addWidget(self.button("Estimate numbering region", self.run_phone_estimate, True))
         layout.addLayout(row)
-        status = QLabel("Offline metadata • No device tracking • No network request or coordinates")
+        self.phone_authorized = QCheckBox("I am authorized to send this phone number to Twilio for lookup")
+        self.phone_paid_carrier = QCheckBox("Include carrier/type lookup (Twilio charges and coverage restrictions may apply)")
+        layout.addWidget(self.phone_authorized)
+        layout.addWidget(self.phone_paid_carrier)
+        layout.addWidget(self.button("Twilio phone lookup", self.run_twilio_phone))
+        status = QLabel("Ready. Region estimates are offline; Twilio lookup sends the number to the provider. No device tracking or coordinates.")
         status.setWordWrap(True)
         status.setObjectName("muted")
         layout.addWidget(status)
@@ -513,6 +518,22 @@ class MainWindow(QMainWindow):
         split.setSizes([450, 180])
         layout.addWidget(split, 1)
         self.phone_controls = {"status": status, "table": table, "raw": raw}
+
+    def run_twilio_phone(self):
+        if not self.phone_authorized.isChecked():
+            return self.error("Confirm authorization to send the number to Twilio.")
+        value = self.phone_number.text()
+        source = "twilio_phone_carrier" if self.phone_paid_carrier.isChecked() else "twilio_phone"
+        case_id = self.active_case()
+        def task():
+            self.session.check("collect")
+            result = self.collector.collect(source, value)
+            if case_id:
+                self.session.save_finding(case_id, "phone", result)
+            else:
+                self.session.audit("twilio_phone_lookup", result.status + "; no case selected")
+            return result
+        self.start_job("Twilio phone lookup", task, lambda result: self.show_result("phone", result))
 
     def run_phone_estimate(self):
         value, region = self.phone_number.text(), self.phone_region.text()
@@ -839,7 +860,9 @@ class MainWindow(QMainWindow):
         layout.addLayout(row)
         form = QFormLayout()
         self.key_fields = {}
-        for key, title in [("hibp", "HIBP subscription key"), ("otx", "OTX API key"), ("urlhaus", "URLhaus Auth-Key")]:
+        for key, title in [("hibp", "HIBP subscription key"), ("otx", "OTX API key"), ("urlhaus", "URLhaus Auth-Key"),
+                           ("twilio_account_sid", "Twilio Account SID (AC...)"), ("twilio_key_sid", "Twilio API key SID (SK...)"),
+                           ("twilio_key_secret", "Twilio API key secret (replacement key)")]:
             field = QLineEdit()
             field.setEchoMode(QLineEdit.Password)
             field.setEnabled(False)

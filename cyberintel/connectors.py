@@ -1,5 +1,6 @@
 """Read-only public connectors. Never visits threat URLs or downloads payloads."""
 import hashlib
+import base64
 import ipaddress
 import json
 import math
@@ -198,6 +199,34 @@ class Collector:
                           status="unavailable", freshness="unknown", error=str(exc))
 
     def _collect(self, source, target):
+        if source in {"twilio_phone", "twilio_phone_carrier"}:
+            target = target.strip()
+            if not re.fullmatch(r"\+[1-9][0-9]{6,14}", target):
+                raise ValidationError("Twilio requires +country-code format using digits only, for example +14155552671.")
+            account = self.keys.get("twilio_account_sid", "").strip()
+            key = self.keys.get("twilio_key_sid", "").strip()
+            secret = self.keys.get("twilio_key_secret", "")
+            if not re.fullmatch(r"AC[0-9a-fA-F]{32}", account) or not re.fullmatch(r"SK[0-9a-fA-F]{32}", key) or not secret:
+                raise RuntimeError("Unlock the vault and configure a Twilio Account SID, replacement API key SID and API key secret in Settings.")
+            url = self.endpoint("twilio") + "/PhoneNumbers/" + quote(target, safe="")
+            if source == "twilio_phone_carrier":
+                url += "?Fields=line_type_intelligence"
+            authorization = base64.b64encode((key + ":" + secret).encode()).decode("ascii")
+            data, ref, _ = self._request("GET", url, headers={"Authorization": "Basic " + authorization})
+            if not isinstance(data, dict) or not isinstance(data.get("valid"), bool):
+                raise RuntimeError("Malformed Twilio Lookup response.")
+            line = data.get("line_type_intelligence")
+            if line is not None and not isinstance(line, dict):
+                raise RuntimeError("Malformed Twilio line type response.")
+            allowed = {"phone_number", "national_format", "country_code", "calling_country_code", "valid", "validation_errors"}
+            result = {name: value for name, value in data.items() if name in allowed}
+            if source == "twilio_phone_carrier":
+                fields = {"type", "carrier_name", "mobile_country_code", "mobile_network_code", "error_code"}
+                result["line_type_intelligence"] = {name: value for name, value in (line or {}).items() if name in fields}
+                if line is None or line.get("error_code"):
+                    result["warning"] = "Carrier/type data unavailable or rejected; check provider error_code and coverage."
+            result["note"] = "Phone validation and optional carrier/type metadata only. This does not identify an owner, home address, current location or GPS coordinates."
+            return Result("Twilio Lookup", ref, target, result)
         if source == "dns":
             host = domain(target)
             resolver = dns.resolver.Resolver()

@@ -82,6 +82,12 @@ Filter/sort the table, then use **Check DNS for filtered names (max 100)** to re
 
 Run `.venv/bin/python scripts/check_subdomains.py` for an optional public example.com check. The initial enhanced live check encountered HTTP 502 from crt.sh; see `artifacts/live-subdomain-check.json` for the latest outcome. Unit/integration checks use deterministic CT/DNS fixtures, including malformed sources, legacy caches, source failures, filtering, export and case persistence. `artifacts/subdomain-discovery-synthetic.png` is explicitly synthetic visual QA.
 
+## Twilio phone lookup
+
+In Settings, unlock the encrypted vault and enter your Twilio Account SID (AC...), API key SID (SK...), and API key secret. Use a replacement key if a secret has been exposed; never put credentials in source code or chat. In Phone region estimate, enter a digits-only number with a +country code, confirm authorization to send it to Twilio, then click **Twilio phone lookup**. Validation is the default. Enable **Include carrier/type lookup** to request the additional package; provider charges and coverage restrictions apply. Live requests authenticate using the API key SID/secret over HTTPS. Case findings contain only allowed lookup metadata, not credentials.
+
+The [Twilio Line Type Intelligence API](https://www.twilio.com/docs/lookup/v2-api/line-type-intelligence) can return carrier and line type. It does not provide the subscriber's name, residential address, GPS coordinates or current location in this integration. Offline region estimates remain available without API keys. Tests use synthetic credentials and responses; no live paid Twilio lookup has been run.
+
 ## Input schemas
 
 Column names are normalized to lowercase. CSV and XLSX imports are limited to 50 MiB and 100,000 rows; expanded XLSX content is limited to 150 MiB. XLSX files with VBA content are rejected. The first worksheet is used. Phone columns are read as strings to preserve leading zeros and `+` signs.
@@ -111,7 +117,7 @@ Open **Phone region estimate** and enter an international number beginning with 
 
 Offline `phonenumbers` metadata returns country/territory, a numbering allocation area where available, number type, original carrier, associated time zones and metadata version. The result is labeled `record_kind: inferred` and `status: offline`, and is saved as a `phone` finding when a case is selected. Saved phone findings can be restored from Reports & audit and are included in PDF/CSV reports.
 
-These are numbering-plan associations, **not current or past device location**. Many mobile prefixes provide only a country, with no city-level area. Portability, roaming and reassignment can invalidate carrier/area associations. Number validity does not prove that it is active or identify its subscriber. The feature makes no network request, accesses no telecom database and produces no coordinates or map pin. For actual location records, import authorized GPS/tower evidence in Geospatial. [Library metadata and limitations](https://github.com/daviddrysdale/python-phonenumbers), [original-carrier portability limitation](https://daviddrysdale.github.io/python-phonenumbers/phonenumbers.carrier.html).
+These are numbering-plan associations, **not current or past device location**. Many mobile prefixes provide only a country, with no city-level area. Portability, roaming and reassignment can invalidate carrier/area associations. Number validity does not prove that it is active or identify its subscriber. The offline estimate makes no network request, accesses no telecom database and produces no coordinates or map pin. For actual location records, import authorized GPS/tower evidence in Geospatial. [Library metadata and limitations](https://github.com/daviddrysdale/python-phonenumbers), [original-carrier portability limitation](https://daviddrysdale.github.io/python-phonenumbers/phonenumbers.carrier.html).
 
 **PCAP**: files must have recognized PCAP/PCAPNG magic, be <=200 MiB and contain <=500,000 packets. `tshark -n -r` extracts protocol counts, byte totals, DNS queries, connection metadata and review heuristics. Processing has a 120-second timeout; DNS and connection lists show the top 5,000 entries. Split larger captures with Wireshark/editcap. Capture and traffic decryption are outside this release.
 
