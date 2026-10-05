@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QRunnable, QSortFilterProxyModel, Qt, QThreadPool, QTimer, Signal, Slot, QUrl
-from PySide6.QtGui import QDesktopServices, QFont
+from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog,
     QLabel, QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar, QPushButton,
@@ -50,6 +50,17 @@ QCheckBox { spacing: 8px; }
 QSplitter::handle { background: #26324a; }
 QToolTip { background: #26324a; color: white; border: 1px solid #657494; }
 """
+
+
+def credential_eye_icon(visible=False):
+    strike = '<path d="M3 3L21 21"/>' if visible else ''
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" '
+           'fill="none" stroke="#b59bff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+           '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>'
+           '<circle cx="12" cy="12" r="3"/>' + strike + '</svg>')
+    pixmap = QPixmap()
+    pixmap.loadFromData(svg.encode(), "SVG")
+    return QIcon(pixmap)
 
 
 class TableModel(QAbstractTableModel):
@@ -860,12 +871,21 @@ class MainWindow(QMainWindow):
         layout.addLayout(row)
         form = QFormLayout()
         self.key_fields = {}
+        self.key_visibility = {}
         for key, title in [("hibp", "HIBP subscription key"), ("otx", "OTX API key"), ("urlhaus", "URLhaus Auth-Key"),
                            ("twilio_account_sid", "Twilio Account SID (AC...)"), ("twilio_key_sid", "Twilio API key SID (SK...)"),
                            ("twilio_key_secret", "Twilio API key secret (replacement key)")]:
             field = QLineEdit()
             field.setEchoMode(QLineEdit.Password)
             field.setEnabled(False)
+            eye = field.addAction(credential_eye_icon(), QLineEdit.TrailingPosition)
+            eye.setCheckable(True)
+            eye.setEnabled(False)
+            eye.setText("Show " + title)
+            eye.setToolTip("Show credential")
+            eye.toggled.connect(lambda visible, field=field, eye=eye, title=title:
+                                self.toggle_credential_visibility(field, eye, title, visible))
+            self.key_visibility[key] = eye
             self.key_fields[key] = field
             form.addRow(title, field)
         layout.addLayout(form)
@@ -879,6 +899,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(endpoints)
         layout.addStretch()
 
+    def toggle_credential_visibility(self, field, eye, title, visible):
+        field.setEchoMode(QLineEdit.Normal if visible else QLineEdit.Password)
+        eye.setIcon(credential_eye_icon(visible))
+        eye.setText(("Hide " if visible else "Show ") + title)
+        eye.setToolTip("Hide credential" if visible else "Show credential")
+
     def unlock_vault(self):
         if self.busy:
             self.notice.setText("Wait for the running task before changing credentials.")
@@ -891,6 +917,9 @@ class MainWindow(QMainWindow):
             self.vault = Vault(self.config.home / "vault.enc", passphrase)
             self.collector.keys = dict(self.vault.values)
             for name, field in self.key_fields.items():
+                self.key_visibility[name].setChecked(False)
+                self.key_visibility[name].setEnabled(True)
+                field.setEchoMode(QLineEdit.Password)
                 field.setEnabled(True)
                 field.setText(self.vault.get(name))
             self.save_keys_button.setEnabled(True)
@@ -905,7 +934,10 @@ class MainWindow(QMainWindow):
             return
         self.vault = None
         self.collector.keys = {}
-        for field in self.key_fields.values():
+        for name, field in self.key_fields.items():
+            self.key_visibility[name].setChecked(False)
+            self.key_visibility[name].setEnabled(False)
+            field.setEchoMode(QLineEdit.Password)
             field.clear()
             field.setEnabled(False)
         self.save_keys_button.setEnabled(False)
