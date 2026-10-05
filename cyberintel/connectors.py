@@ -224,8 +224,50 @@ class Collector:
             return Result("RDAP", reference, target, data)
         if source == "ct":
             target = domain(target)
-            url = self.endpoint(source) + "/?q=" + quote("%." + target) + "&output=json"
-            data, ref, _ = self._request("GET", url)
+            try:
+                return self._collect("ct_primary", target)
+            except (RuntimeError, ValueError, socket.gaierror, KeyError) as primary_error:
+                try:
+                    result = self._collect("certspotter", target)
+                    result.data["provider_errors"] = {"crt.sh": str(primary_error)}
+                    return result
+                except (RuntimeError, ValueError, socket.gaierror, KeyError) as fallback_error:
+                    raise RuntimeError(f"Certificate sources unavailable. crt.sh: {primary_error}; Cert Spotter: {fallback_error}. Retry later; provider rate limits may apply.") from None
+        if source in {"ct_primary", "certspotter"}:
+            target = domain(target)
+            truncated, warnings = False, []
+            if source == "ct_primary":
+                url = self.endpoint("ct") + "/?q=" + quote("%." + target) + "&output=json"
+                data, ref, _ = self._request("GET", url)
+                provider = "Certificate Transparency / crt.sh"
+            else:
+                url = self.endpoint("certspotter") + "/issuances?domain=" + quote(target) + "&include_subdomains=true&expand=dns_names"
+                data, after, seen = [], "", set()
+                provider, ref = "Certificate Transparency / Cert Spotter", url
+                for page in range(5):
+                    try:
+                        batch, _, _ = self._request("GET", url + ("&after=" + quote(after, safe="") if after else ""))
+                        if not isinstance(batch, list) or any(not isinstance(row, dict) or not isinstance(row.get("dns_names"), list)
+                                or any(not isinstance(name, str) for name in row["dns_names"]) for row in batch):
+                            raise RuntimeError("Malformed Cert Spotter response.")
+                    except (RuntimeError, ValueError, socket.gaierror, KeyError) as exc:
+                        if not data:
+                            raise
+                        truncated = True
+                        warnings.append("Incomplete pagination: " + str(exc))
+                        break
+                    if not batch:
+                        break
+                    data.extend({"name_value": "\n".join(row["dns_names"])} for row in batch)
+                    after = batch[-1].get("id")
+                    if not isinstance(after, str) or not after or after in seen:
+                        truncated = True
+                        warnings.append("Provider omitted or repeated the pagination cursor.")
+                        break
+                    seen.add(after)
+                else:
+                    truncated = True
+                    warnings.append("Stopped at the five-page request limit.")
             if isinstance(data, str):
                 data = json.loads(data)
             if not isinstance(data, list) or any(not isinstance(row, dict) or not isinstance(row.get("name_value", ""), str) for row in data):
@@ -242,9 +284,10 @@ class Collector:
                     if name == target or name.endswith("." + target):
                         names.add(name)
                         (wildcards if wildcard else concrete).add(name)
-            return Result("Certificate Transparency / crt.sh", ref, target,
+            return Result(provider, ref, target,
                           {"subdomains": sorted(names), "certificate_count": len(data),
                            "concrete_names": sorted(concrete), "wildcard_patterns": ["*." + name for name in sorted(wildcards)],
+                           "truncated": truncated, "warnings": warnings,
                            "note": "Certificate observations do not establish that a host is currently active."})
         if source == "website":
             target = domain(target)

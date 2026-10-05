@@ -394,7 +394,7 @@ class MainWindow(QMainWindow):
         self.start_job("Nmap TCP service and version scan", task, lambda result: self.show_result("nmap", result))
 
     def build_subdomains_page(self):
-        layout = self.page("Find public subdomains from certificate transparency. No API key is required.")
+        layout = self.page("Find public subdomains from crt.sh, with automatic Cert Spotter fallback. Public queries are rate limited by providers.")
         row = QHBoxLayout()
         self.subdomain_target = QLineEdit()
         self.subdomain_target.setPlaceholderText("Root domain, e.g. example.com")
@@ -577,6 +577,8 @@ class MainWindow(QMainWindow):
         if key in {"osint", "subdomains"} and isinstance(result.data, dict) and result.data.get("records") and "subdomain" in result.data["records"][0]:
             checked = sum(bool(row.get("dns_checked_at")) for row in result.data["records"])
             controls["status"].setText(controls["status"].text() + f" • DNS checked: {checked}/{len(result.data['records'])}; filter and check remaining names")
+        if key in {"osint", "subdomains"} and isinstance(result.data, dict) and result.data.get("truncated"):
+            controls["status"].setText(controls["status"].text() + " • Partial discovery; see warnings in details")
         if key == "cdr":
             plot = controls["plot"]
             plot.clear()

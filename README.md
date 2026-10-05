@@ -72,7 +72,7 @@ URLhaus reports **high** when an entry is online and labeled `malware_download`,
 
 ## Subdomain discovery
 
-Open **Subdomain discovery**, enter a root domain such as `example.com`, and click **Find subdomains**. This queries the configured crt.sh certificate-transparency endpoint using the existing HTTPS, retry and cache controls. An API key is not required. Results are deduplicated, normalized, restricted to descendants of the domain, and exclude the apex. Wildcard-only certificate patterns are listed separately in the details pane; a wildcard certificate does not invent a concrete host.
+Open **Subdomain discovery**, enter a root domain such as `example.com`, and click **Find subdomains**. This queries crt.sh using the existing HTTPS, retry and cache controls. If crt.sh fails, the app sends the domain to the configured Cert Spotter endpoint as a fallback. The public fallback is rate limited and searches unexpired certificate issuances; its coverage differs from crt.sh. Fallback requests are capped at five pages. Pagination failures and limits retain observed names with an explicit partial-results warning. The source, original crt.sh error, and fallback warnings appear in details. If both providers fail, a saved response is labeled stale or the result is unavailable. Results are deduplicated, normalized, restricted to descendants of the domain, and exclude the apex. Wildcard-only certificate patterns are listed separately in the details pane; a wildcard certificate does not invent a concrete host.
 
 **Resolve IPs (first 100)** is enabled by default: discovery automatically checks A/AAAA records for up to 100 names before displaying/saving the result. Uncheck it for passive CT-only discovery. The CT option in Live OSINT also enriches the first 100 names. IPv4/IPv6 columns appear beside the hostname and show readable addresses or `No A record`, `No AAAA record`, `DNS lookup failed`, or `Not checked`. IPv6 is not published for every host.
 
@@ -229,5 +229,6 @@ Verification here uses synthetic XML and a mocked Nmap process, including the GU
 - [OTX official SDK/API contract](https://github.com/AlienVault-OTX/OTX-Python-SDK)
 - [TShark reference](https://www.wireshark.org/docs/man-pages/tshark.html)
 - [Certificate transparency source](https://crt.sh/)
+- [Cert Spotter fallback API and rate limits](https://sslmate.com/help/reference/ct_search_api_v1)
 
 Only public and authorized metadata/files are used. No stolen password databases, private telecom access, access-control bypass or malware-download operations are implemented.

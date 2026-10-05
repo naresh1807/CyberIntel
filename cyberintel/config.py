@@ -9,6 +9,7 @@ from .models import ValidationError
 DEFAULT_ENDPOINTS = {
     "rdap": "https://rdap.org",
     "ct": "https://crt.sh",
+    "certspotter": "https://api.certspotter.com/v1",
     "hibp": "https://haveibeenpwned.com/api/v3",
     "otx": "https://otx.alienvault.com/api/v1",
     "urlhaus": "https://urlhaus-api.abuse.ch/v1",
