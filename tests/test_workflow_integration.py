@@ -87,19 +87,19 @@ def test_desktop_case_import_analysis_visuals_reports(session, examples, tmp_pat
     window.close()
 
 
-def test_desktop_vault(session, tmp_path, monkeypatch):
+def test_desktop_direct_credentials(session, tmp_path, monkeypatch):
     app = QApplication.instance() or QApplication([])
     window = MainWindow(Config(tmp_path), session)
     errors = []
     monkeypatch.setattr(window, "error", errors.append)
-    monkeypatch.setattr("cyberintel.ui.QInputDialog.getText", lambda *a, **k: ("vault-passphrase-long", True))
-    window.unlock_vault()
+    assert not hasattr(window, "unlock_vault")
+    assert window.key_fields["otx"].isEnabled()
     window.key_fields["otx"].setText("synthetic-api-key")
     window.save_keys()
     assert window.collector.keys["otx"] == "synthetic-api-key"
-    window.lock_vault()
+    window.close()
     assert window.collector.keys == {} and not window.key_fields["otx"].text()
-    window.unlock_vault()
+    window = MainWindow(Config(tmp_path), session)
     assert window.key_fields["otx"].text() == "synthetic-api-key"
     assert not errors
     window.close()

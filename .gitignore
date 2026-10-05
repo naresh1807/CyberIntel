@@ -7,6 +7,7 @@ dist/
 *.sqlite*
 *.log
 vault.enc
+api-credentials.json
 reports/
 .env
 artifacts/

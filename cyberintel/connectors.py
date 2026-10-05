@@ -207,7 +207,7 @@ class Collector:
             key = self.keys.get("twilio_key_sid", "").strip()
             secret = self.keys.get("twilio_key_secret", "")
             if not re.fullmatch(r"AC[0-9a-fA-F]{32}", account) or not re.fullmatch(r"SK[0-9a-fA-F]{32}", key) or not secret:
-                raise RuntimeError("Unlock the vault and configure a Twilio Account SID, replacement API key SID and API key secret in Settings.")
+                raise RuntimeError("Configure a Twilio Account SID, replacement API key SID and API key secret in Settings, then save credentials.")
             url = self.endpoint("twilio") + "/PhoneNumbers/" + quote(target, safe="")
             if source == "twilio_phone_carrier":
                 url += "?Fields=line_type_intelligence"

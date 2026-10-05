@@ -39,7 +39,7 @@ def test_twilio_authentication_allowlist_and_optional_carrier(session):
 def test_twilio_invalid_target_and_missing_keys_make_no_request(session):
     client = collector(session, lambda _: pytest.fail("No request expected"), keys={})
     assert client.collect("twilio_phone", "not-a-number").status == "unavailable"
-    assert "configure" in client.collect("twilio_phone", "+14155552671").error
+    assert "configure" in client.collect("twilio_phone", "+14155552671").error.lower()
 
 
 @pytest.mark.parametrize("payload", [{}, {"valid": "true"}, {"valid": True, "line_type_intelligence": []}])

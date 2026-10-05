@@ -84,7 +84,7 @@ Run `.venv/bin/python scripts/check_subdomains.py` for an optional public exampl
 
 ## Twilio phone lookup
 
-In Settings, unlock the encrypted vault and enter your Twilio Account SID (AC...), API key SID (SK...), and API key secret. Use a replacement key if a secret has been exposed; never put credentials in source code or chat. In Phone region estimate, enter a digits-only number with a +country code, confirm authorization to send it to Twilio, then click **Twilio phone lookup**. Validation is the default. Enable **Include carrier/type lookup** to request the additional package; provider charges and coverage restrictions apply. Live requests authenticate using the API key SID/secret over HTTPS. Case findings contain only allowed lookup metadata, not credentials.
+In Settings, enter your Twilio Account SID (AC...), API key SID (SK...), and API key secret. Use a replacement key if a secret has been exposed; never put credentials in source code or chat. In Phone region estimate, enter a digits-only number with a +country code, confirm authorization to send it to Twilio, then click **Twilio phone lookup**. Validation is the default. Enable **Include carrier/type lookup** to request the additional package; provider charges and coverage restrictions apply. Live requests authenticate using the API key SID/secret over HTTPS. Case findings contain only allowed lookup metadata, not credentials.
 
 The [Twilio Line Type Intelligence API](https://www.twilio.com/docs/lookup/v2-api/line-type-intelligence) can return carrier and line type. It does not provide the subscriber's name, residential address, GPS coordinates or current location in this integration. Offline region estimates remain available without API keys. Tests use synthetic credentials and responses; no live paid Twilio lookup has been run.
 
@@ -125,7 +125,7 @@ The fixtures in `examples/synthetic_*.csv` contain invented data only. Import th
 
 ## Configuration and credentials
 
-Default data directory: `~/.local/share/cyberintel`. Override with `--data-dir /private/path` or `CYBERINTEL_HOME`. The directory contains the SQLite database, encrypted vault, managed evidence, logs and HTML exports. Create a private workspace on an encrypted disk when working with sensitive evidence.
+Default data directory: `~/.local/share/cyberintel`. Override with `--data-dir /private/path` or `CYBERINTEL_HOME`. The directory contains the SQLite database, local API credential file, managed evidence, logs and HTML exports. Create a private workspace on an encrypted disk when working with sensitive evidence.
 
 ```bash
 mkdir -p ~/.local/share/cyberintel
@@ -136,11 +136,11 @@ cp examples/config.json ~/.local/share/cyberintel/config.json
 
 Endpoint, timeout and cache examples are in `examples/config.json`. Restart after editing configuration. Endpoint overrides must use HTTPS, port 443 and no embedded credentials; changing authenticated endpoints sends your key to the new provider, so only use trusted endpoints.
 
-In Settings, unlock/create the vault with a separate 12+ character passphrase, enter HIBP/OTX/URLhaus keys and save. Fernet encrypts the vault using a 32-byte scrypt-derived key and a random salt. The passphrase is never written to disk. Locking removes keys from the active collector and form fields; Python does not guarantee memory zeroization. There is no vault recovery if its passphrase is lost. No API keys belong in JSON configuration or source code.
+In Settings, enter your API credentials and click **Save credentials**. They load automatically when the app opens; there is no unlock passphrase. Eye buttons show/hide field text. The app stores keys in `api-credentials.json` with private file permissions on Linux, without encryption. This file is excluded from Git and protected from report exports. Old `vault.enc` files are preserved but no longer used by the desktop; re-enter keys in Settings. Closing clears form and collector values; Python does not guarantee memory zeroization.
 
-The desktop uses a single local workspace with full application permissions and no account registration or login. Existing cases and evidence remain available. Previous account records are retained for compatibility but do not restrict desktop access. Audit actions use the local-workspace actor. Protect workspace access using your operating system account and file permissions. The credential vault still requires its separate passphrase. SQLite/evidence contents are not encrypted by this application.
+The desktop uses a single local workspace with full application permissions and no account registration or login. Existing cases and evidence remain available. Previous account records are retained for compatibility but do not restrict desktop access. Audit actions use the local-workspace actor. Protect workspace access using your operating system account and file permissions. SQLite/evidence contents are not encrypted by this application.
 
-Linux startup uses a restrictive umask. Vault/database/log files receive private permissions. Audit entries form a SHA-256 chain, checked in Reports & audit. This detects edits to retained entries, but is not externally anchored: a privileged filesystem administrator could rewrite or truncate history. No immutable chain-of-custody certification is claimed.
+Linux startup uses a restrictive umask. Credential/database/log files receive private permissions. Audit entries form a SHA-256 chain, checked in Reports & audit. This detects edits to retained entries, but is not externally anchored: a privileged filesystem administrator could rewrite or truncate history. No immutable chain-of-custody certification is claimed.
 
 HTTP collection uses TLS verification, public-address validation, pinned connections against DNS rebinding, no environment proxy inheritance, bounded responses (8 MiB), bounded retries and Retry-After handling. Authenticated cross-host redirects are rejected. Fresh cache uses a one-hour default TTL; failure fallback is explicitly stale. Logs rotate and do not log query arguments, API keys or response bodies. The database does retain authorized queries, evidence records and findings.
 
@@ -154,7 +154,7 @@ cyberintel/
   ui.py           Desktop pages, table models, background jobs, timers
   config.py       Workspace and endpoint configuration
   models.py       Result/provenance envelope and errors
-  security.py     Authentication primitives, role checks, encrypted vault
+  security.py     Legacy authentication/vault primitives, role checks, direct local credentials
   storage.py      SQLite repository, sessions, evidence, cache and audit
   connectors.py   Validated DNS/RDAP/CT/website/HIBP/OTX/URLhaus collectors
   analysis.py     CDR, geospatial and offline TShark services
@@ -181,7 +181,7 @@ Modules do not depend on the desktop UI. `Result` carries attribution, timestamp
 | 3: breach/threat | HIBP catalog/exposure, OTX, URLhaus, watches/feed timer | Live public HIBP catalog; simulated authenticated HIBP and URLhaus API contracts |
 | 4: offline forensics | CSV/XLSX CDR and TShark adapter | Synthetic CDR calculations/XLSX; simulated TShark process; real-TShark test when installed |
 | 5: geospatial/reports | Location/tower schemas, Folium, Plotly, PDF/CSV | Synthetic import and HTML assertions; reports exported/rendered and inspected |
-| 6: hardening/package | Role checks, lockout, vault, bounds, audits, PyInstaller script, Linux CI | Security/regression tests; Linux installation, actual Linux bundle and credentialed APIs still require target-system validation |
+| 6: hardening/package | Legacy role checks/lockout, direct credentials, bounds, audits, PyInstaller script, Linux CI | Security/regression tests; Linux installation, actual Linux bundle and credentialed APIs still require target-system validation |
 
 Verification in the current Windows environment: **97 tests passed, 1 skipped** (real TShark is absent). The latest audit confirmed live DNS, RDAP, public website metadata and the HIBP catalog; crt.sh returned HTTP 502. The subdomain-address follow-up independently verified live A/AAAA resolution for www.example.com; see `artifacts/subdomain-address-check.json`. See `artifacts/live-source-checks.json`, `artifacts/website-source-check.json`, and [the complete function review](FUNCTION_VERIFICATION.md). No API keys were provided, so authenticated HIBP, OTX and URLhaus were not checked against live accounts.
 
@@ -212,9 +212,9 @@ PyInstaller does not cross-compile Linux binaries from Windows. TShark is an ext
 - PCAP analysis unavailable: check `tshark --version` and PATH. Use smaller captures for timeout/packet limits. No root privileges are required to read your own capture file.
 - Import fails: match the documented column names, timestamp offsets, direction values, coordinate ranges and size limits. Convert legacy `.xls` to `.xlsx` first.
 - Evidence hash mismatch: retain the stored copy and investigate its alteration; do not overwrite the original or silently re-hash it.
-- Credential vault cannot unlock: verify the separate passphrase. Restore from your authorized encrypted backup if the vault is corrupted; there is no password bypass.
+- API credentials: re-enter keys in Settings and save. If the local credential file is corrupted, restore your backup or rename it before starting the app.
 - Report/map/graph unavailable: select a case with saved findings, or restore a saved analysis before opening a visual. Graphs/maps open in the system browser. Offline Folium needs vendored CDN assets.
-- Logs: inspect `application.log` in the selected workspace. Back up the workspace while the app is closed so the SQLite database/evidence/vault remain consistent.
+- Logs: inspect `application.log` in the selected workspace. Back up the workspace while the app is closed so the SQLite database/evidence/credentials remain consistent.
 
 ## Nmap IP scans
 

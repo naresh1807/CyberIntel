@@ -84,3 +84,38 @@ def username(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_.-]{3,64}", value):
         raise ValidationError("Username must be 3–64 letters, numbers, dots, dashes or underscores.")
     return value
+
+
+class LocalCredentials:
+    """Direct local credential storage, without passphrase or encryption."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.values = {}
+        if path.exists():
+            try:
+                if path.stat().st_size > 1024 * 1024:
+                    raise ValueError()
+                values = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(values, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in values.items()):
+                    raise ValueError()
+                self.values = values
+                os.chmod(path, 0o600)
+            except (ValueError, UnicodeError):
+                raise ValidationError("Invalid local API credential file. Existing contents were not replaced.") from None
+
+    def get(self, name):
+        return self.values.get(name, "")
+
+    def save(self, values):
+        new_values = {name: str(value).strip() for name, value in values.items() if str(value).strip()}
+        descriptor, name = tempfile.mkstemp(prefix=".cyberintel-credentials-", dir=self.path.parent)
+        temporary = Path(name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+                json.dump(new_values, file)
+            os.chmod(temporary, 0o600)
+            temporary.replace(self.path)
+            self.values = new_values
+        finally:
+            temporary.unlink(missing_ok=True)

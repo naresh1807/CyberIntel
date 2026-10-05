@@ -36,11 +36,11 @@ def main():
     try:
         store = Store(config.home)
         session = store.open_workspace()
+        window = MainWindow(config, session)
     except (sqlite3.Error, ValueError, OSError) as exc:
         logger.error("Workspace initialization failed (%s)", type(exc).__name__)
         QMessageBox.critical(None, "CyberIntel Suite could not start", f"Unable to open this workspace: {exc}")
         return 1
-    window = MainWindow(config, session)
     window.show()
     logger.info("Desktop started")
     sys.exit(app.exec())

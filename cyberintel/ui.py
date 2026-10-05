@@ -20,7 +20,7 @@ from .nmap_scan import scan_ips
 from .subdomains import discover_subdomains, verify_subdomains, enrich_subdomains, export_subdomains
 from .output import validate_export_destination
 from .reporting import export_csv, export_pdf
-from .security import Vault
+from .security import LocalCredentials
 
 STYLE = """
 QWidget { background: #0c101c; color: #dce3f3; font-family: 'Segoe UI', 'DejaVu Sans'; font-size: 13px; }
@@ -166,8 +166,8 @@ class MainWindow(QMainWindow):
     def __init__(self, config, session):
         super().__init__()
         self.config, self.session = config, session
-        self.collector = Collector(config, session.store)
-        self.vault = None
+        self.credentials = LocalCredentials(config.home / "api-credentials.json")
+        self.collector = Collector(config, session.store, keys=self.credentials.values)
         self.jobs = {}
         self.busy = False
         self.last_results = {}
@@ -863,12 +863,7 @@ class MainWindow(QMainWindow):
                        lambda valid: QMessageBox.information(self, "Audit integrity", "Retained audit entries are consistent. Chain is not externally anchored." if valid else "Audit chain mismatch detected."))
 
     def build_settings(self):
-        layout = self.page("Credentials are encrypted in a local vault. The unlock passphrase is never stored. API terms and subscriptions apply.")
-        row = QHBoxLayout()
-        row.addWidget(self.button("Unlock / create credential vault", self.unlock_vault, True))
-        row.addWidget(self.button("Lock vault", self.lock_vault))
-        row.addStretch()
-        layout.addLayout(row)
+        layout = self.page("Enter API credentials directly and save. Stored locally without encryption; no vault passphrase is required.")
         form = QFormLayout()
         self.key_fields = {}
         self.key_visibility = {}
@@ -877,10 +872,10 @@ class MainWindow(QMainWindow):
                            ("twilio_key_secret", "Twilio API key secret (replacement key)")]:
             field = QLineEdit()
             field.setEchoMode(QLineEdit.Password)
-            field.setEnabled(False)
+            field.setText(self.credentials.get(key))
             eye = field.addAction(credential_eye_icon(), QLineEdit.TrailingPosition)
             eye.setCheckable(True)
-            eye.setEnabled(False)
+            eye.setEnabled(True)
             eye.setText("Show " + title)
             eye.setToolTip("Show credential")
             eye.toggled.connect(lambda visible, field=field, eye=eye, title=title:
@@ -889,8 +884,7 @@ class MainWindow(QMainWindow):
             self.key_fields[key] = field
             form.addRow(title, field)
         layout.addLayout(form)
-        self.save_keys_button = self.button("Save encrypted credentials", self.save_keys)
-        self.save_keys_button.setEnabled(False)
+        self.save_keys_button = self.button("Save credentials", self.save_keys)
         layout.addWidget(self.save_keys_button)
         endpoints = QLabel("Connector endpoint configuration: " + str(self.config.home / "config.json") + "\n" +
                           "\n".join(f"{k}: {v}" for k, v in self.config.endpoints.items()))
@@ -905,43 +899,13 @@ class MainWindow(QMainWindow):
         eye.setText(("Hide " if visible else "Show ") + title)
         eye.setToolTip("Hide credential" if visible else "Show credential")
 
-    def unlock_vault(self):
-        if self.busy:
-            self.notice.setText("Wait for the running task before changing credentials.")
-            return
-        try:
-            self.session.check("settings")
-            passphrase, ok = QInputDialog.getText(self, "Credential vault", "Vault passphrase (12+ characters):", QLineEdit.Password)
-            if not ok:
-                return
-            self.vault = Vault(self.config.home / "vault.enc", passphrase)
-            self.collector.keys = dict(self.vault.values)
-            for name, field in self.key_fields.items():
-                self.key_visibility[name].setChecked(False)
-                self.key_visibility[name].setEnabled(True)
-                field.setEchoMode(QLineEdit.Password)
-                field.setEnabled(True)
-                field.setText(self.vault.get(name))
-            self.save_keys_button.setEnabled(True)
-            self.session.audit("vault_unlocked", "Credential vault unlocked")
-            self.notice.setText("Credential vault unlocked for this session")
-        except Exception as exc:
-            self.error(str(exc))
-
-    def lock_vault(self):
-        if self.busy:
-            self.notice.setText("Wait for the running task before locking the vault.")
-            return
-        self.vault = None
+    def clear_credentials_from_memory(self):
         self.collector.keys = {}
+        self.credentials.values = {}
         for name, field in self.key_fields.items():
             self.key_visibility[name].setChecked(False)
-            self.key_visibility[name].setEnabled(False)
             field.setEchoMode(QLineEdit.Password)
             field.clear()
-            field.setEnabled(False)
-        self.save_keys_button.setEnabled(False)
-        self.notice.setText("Credential vault locked")
 
     def save_keys(self):
         if self.busy:
@@ -949,12 +913,10 @@ class MainWindow(QMainWindow):
             return
         try:
             self.session.check("settings")
-            if not self.vault:
-                raise ValidationError("Unlock the credential vault first.")
-            self.vault.save({name: field.text() for name, field in self.key_fields.items()})
-            self.collector.keys = dict(self.vault.values)
-            self.session.audit("credentials_updated", "Encrypted API credentials saved")
-            self.notice.setText("Encrypted credentials saved")
+            self.credentials.save({name: field.text() for name, field in self.key_fields.items()})
+            self.collector.keys = dict(self.credentials.values)
+            self.session.audit("credentials_updated", "Local API credentials saved")
+            self.notice.setText("Credentials saved")
         except Exception as exc:
             self.error(str(exc))
 
@@ -1166,5 +1128,5 @@ class MainWindow(QMainWindow):
             return
         self.monitor.stop()
         self.feed_timer.stop()
-        self.lock_vault()
+        self.clear_credentials_from_memory()
         super().closeEvent(event)
