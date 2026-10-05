@@ -64,6 +64,12 @@ class Store:
         with self.connection() as db:
             return db.execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0
 
+    def open_workspace(self):
+        """Open the single-user desktop without creating or authenticating accounts."""
+        with self.connection() as db:
+            self._audit(db, "local-workspace", "workspace_opened", "Direct desktop session started")
+        return LocalSession(self, "local-workspace", "admin")
+
     @staticmethod
     def _audit(db, actor, action, detail):
         previous = db.execute("SELECT entry_hash FROM audit ORDER BY id DESC LIMIT 1").fetchone()
@@ -281,3 +287,10 @@ class Session:
                 return False
             previous = row["entry_hash"]
         return True
+
+
+class LocalSession(Session):
+    """Single-user workspace permissions, independent of legacy account records."""
+
+    def check(self, permission):
+        require("admin", permission)

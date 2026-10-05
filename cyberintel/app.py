@@ -5,11 +5,11 @@ import sys
 import sqlite3
 from logging.handlers import RotatingFileHandler
 
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .config import Config
 from .storage import Store
-from .ui import LoginDialog, MainWindow, STYLE
+from .ui import MainWindow, STYLE
 
 
 def main():
@@ -35,14 +35,12 @@ def main():
     app.setStyleSheet(STYLE)
     try:
         store = Store(config.home)
+        session = store.open_workspace()
     except (sqlite3.Error, ValueError, OSError) as exc:
         logger.error("Workspace initialization failed (%s)", type(exc).__name__)
         QMessageBox.critical(None, "CyberIntel Suite could not start", f"Unable to open this workspace: {exc}")
         return 1
-    login = LoginDialog(store)
-    if login.exec() != QDialog.Accepted:
-        return
-    window = MainWindow(config, login.session)
+    window = MainWindow(config, session)
     window.show()
     logger.info("Desktop started")
     sys.exit(app.exec())

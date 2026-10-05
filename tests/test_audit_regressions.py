@@ -242,7 +242,7 @@ def test_role_revocation_updates_ui_and_backend(session, tmp_path):
         db.execute("UPDATE users SET role='viewer' WHERE name='admin'")
     window.refresh()
     assert session.role == "viewer"
-    assert window.user_table.model.rowCount() == 0
+    assert not hasattr(window, "user_table")
     with pytest.raises(AccessDenied):
         session.create_case("Denied after revocation")
     window.close()

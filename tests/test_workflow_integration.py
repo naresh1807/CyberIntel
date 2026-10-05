@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QDialog, QLineEdit
 from cyberintel.analysis import analyze_cdr
 from cyberintel.config import Config
 from cyberintel.models import Result, utcnow
-from cyberintel.ui import LoginDialog, MainWindow
+from cyberintel.ui import MainWindow
 from cyberintel.storage import Store
 
 
@@ -21,17 +21,23 @@ def wait_job(app, window):
     assert not window.busy
 
 
-def test_login_bootstrap_and_existing_user_dialog(tmp_path):
+def test_direct_workspace_new_and_existing_accounts(tmp_path):
     app = QApplication.instance() or QApplication([])
     store = Store(tmp_path)
-    for _ in range(2):
-        login = LoginDialog(store)
-        login.name.setText("test-admin")
-        login.password.setText("test-password-long")
-        login.submit()
-        assert login.result() == QDialog.Accepted
-        assert login.session.role == "admin"
-        assert not login.password.text()
+    direct = store.open_workspace()
+    assert not store.initialized()
+    case = direct.create_case("Direct access case")
+    assert direct.verify_audit()
+    store.bootstrap("old-admin", "old-password-long")
+    with store.connection() as db:
+        db.execute("UPDATE users SET role='viewer', locked_until='2099-01-01' WHERE name='old-admin'")
+    reopened = store.open_workspace()
+    assert reopened.rows("cases")[0]["id"] == case
+    reopened.create_case("Still accessible")
+    window = MainWindow(Config(tmp_path), reopened)
+    assert not hasattr(window, "add_user")
+    assert not hasattr(window, "user_table")
+    window.close()
 
 
 def test_desktop_case_import_analysis_visuals_reports(session, examples, tmp_path, monkeypatch):
@@ -81,7 +87,7 @@ def test_desktop_case_import_analysis_visuals_reports(session, examples, tmp_pat
     window.close()
 
 
-def test_desktop_vault_and_add_user(session, tmp_path, monkeypatch):
+def test_desktop_vault(session, tmp_path, monkeypatch):
     app = QApplication.instance() or QApplication([])
     window = MainWindow(Config(tmp_path), session)
     errors = []
@@ -95,11 +101,6 @@ def test_desktop_vault_and_add_user(session, tmp_path, monkeypatch):
     assert window.collector.keys == {} and not window.key_fields["otx"].text()
     window.unlock_vault()
     assert window.key_fields["otx"].text() == "synthetic-api-key"
-    values = iter([("test-viewer", True), ("viewer-password-long", True)])
-    monkeypatch.setattr("cyberintel.ui.QInputDialog.getText", lambda *a, **k: next(values))
-    monkeypatch.setattr("cyberintel.ui.QInputDialog.getItem", lambda *a, **k: ("viewer", True))
-    window.add_user()
-    assert session.store.login("test-viewer", "viewer-password-long").role == "viewer"
     assert not errors
     window.close()
 

@@ -12,7 +12,7 @@ The dependencies have already been installed in `.venv`:
 .\.venv\Scripts\python.exe -m cyberintel
 ```
 
-Create a local administrator at first launch. There is no default password. Use at least 12 characters. Although Linux is the deployment target, the desktop and tabular analysis also run on Windows. TShark must be installed separately for PCAP analysis.
+The app opens directly into the local workspace, with no login or registration. Although Linux is the deployment target, the desktop and tabular analysis also run on Windows. TShark must be installed separately for PCAP analysis.
 
 ## Kali Linux / Ubuntu installation
 
@@ -132,7 +132,7 @@ Endpoint, timeout and cache examples are in `examples/config.json`. Restart afte
 
 In Settings, unlock/create the vault with a separate 12+ character passphrase, enter HIBP/OTX/URLhaus keys and save. Fernet encrypts the vault using a 32-byte scrypt-derived key and a random salt. The passphrase is never written to disk. Locking removes keys from the active collector and form fields; Python does not guarantee memory zeroization. There is no vault recovery if its passphrase is lost. No API keys belong in JSON configuration or source code.
 
-Authentication passwords use salted scrypt. Five failures lock an account for five minutes. Admins can create users: viewers read/report; analysts collect/manage cases and evidence; admins also manage credentials and users. Roles apply in backend services, not only navigation. This is a shared local workspace, not a per-case multi-tenant access system. Local users with direct filesystem access can bypass application-level controls; protect the workspace with OS permissions. SQLite/evidence contents are not encrypted by this application.
+The desktop uses a single local workspace with full application permissions and no account registration or login. Existing cases and evidence remain available. Previous account records are retained for compatibility but do not restrict desktop access. Audit actions use the local-workspace actor. Protect workspace access using your operating system account and file permissions. The credential vault still requires its separate passphrase. SQLite/evidence contents are not encrypted by this application.
 
 Linux startup uses a restrictive umask. Vault/database/log files receive private permissions. Audit entries form a SHA-256 chain, checked in Reports & audit. This detects edits to retained entries, but is not externally anchored: a privileged filesystem administrator could rewrite or truncate history. No immutable chain-of-custody certification is claimed.
 

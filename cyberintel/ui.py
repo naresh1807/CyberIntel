@@ -148,47 +148,6 @@ class Job(QRunnable):
             self.signals.failure.emit(self.identifier, str(exc))
 
 
-class LoginDialog(QDialog):
-    def __init__(self, store):
-        super().__init__()
-        self.store, self.session = store, None
-        self.setWindowTitle("CyberIntel Suite • Local authentication")
-        self.setMinimumWidth(420)
-        layout = QVBoxLayout(self)
-        first = not store.initialized()
-        heading = QLabel("Create your administrator" if first else "Welcome back")
-        heading.setObjectName("title")
-        layout.addWidget(heading)
-        info = QLabel("Local workspace • Passwords require at least 12 characters" if first else "Sign in to your local investigation workspace")
-        info.setWordWrap(True)
-        info.setObjectName("muted")
-        layout.addWidget(info)
-        form = QFormLayout()
-        self.name, self.password = QLineEdit(), QLineEdit()
-        self.password.setEchoMode(QLineEdit.Password)
-        form.addRow("Username", self.name)
-        form.addRow("Password", self.password)
-        layout.addLayout(form)
-        self.error = QLabel("")
-        self.error.setWordWrap(True)
-        layout.addWidget(self.error)
-        submit = QPushButton("Create workspace" if first else "Sign in")
-        submit.setObjectName("primary")
-        layout.addWidget(submit)
-        submit.clicked.connect(self.submit)
-        self.password.returnPressed.connect(self.submit)
-
-    def submit(self):
-        try:
-            if not self.store.initialized():
-                self.store.bootstrap(self.name.text(), self.password.text())
-            self.session = self.store.login(self.name.text(), self.password.text())
-            self.password.clear()
-            self.accept()
-        except Exception as exc:
-            self.error.setText(str(exc))
-
-
 class MainWindow(QMainWindow):
     PAGE_NAMES = ["Overview", "Live OSINT", "Breach intelligence", "Threat intelligence", "CDR analysis", "Network forensics", "Geospatial", "Phone region estimate", "Cases & evidence", "Reports & audit", "Settings", "Subdomain discovery", "Nmap IP scan"]
 
@@ -225,7 +184,7 @@ class MainWindow(QMainWindow):
         for name in self.PAGE_NAMES:
             self.navigation.addItem(name)
         side.addWidget(self.navigation, 1)
-        identity = QLabel(f"{session.actor}\n{session.role.upper()} · LOCAL WORKSPACE")
+        identity = QLabel("LOCAL WORKSPACE\nDIRECT ACCESS")
         identity.setObjectName("muted")
         side.addWidget(identity)
         shell.addWidget(sidebar)
@@ -876,12 +835,7 @@ class MainWindow(QMainWindow):
         endpoints.setWordWrap(True)
         endpoints.setObjectName("muted")
         layout.addWidget(endpoints)
-        row2 = QHBoxLayout()
-        row2.addWidget(self.button("Add local user", self.add_user))
-        row2.addStretch()
-        layout.addLayout(row2)
-        self.user_table = DataTable()
-        layout.addWidget(self.user_table, 1)
+        layout.addStretch()
 
     def unlock_vault(self):
         if self.busy:
@@ -927,22 +881,6 @@ class MainWindow(QMainWindow):
             self.collector.keys = dict(self.vault.values)
             self.session.audit("credentials_updated", "Encrypted API credentials saved")
             self.notice.setText("Encrypted credentials saved")
-        except Exception as exc:
-            self.error(str(exc))
-
-    def add_user(self):
-        try:
-            self.session.check("users")
-            name, ok = QInputDialog.getText(self, "New user", "Username:")
-            if not ok:
-                return
-            password, ok = QInputDialog.getText(self, "New user", "Password (12+ characters):", QLineEdit.Password)
-            if not ok:
-                return
-            role, ok = QInputDialog.getItem(self, "New user", "Role:", ["viewer", "analyst", "admin"], editable=False)
-            if ok:
-                self.session.add_user(name, password, role)
-                self.refresh()
         except Exception as exc:
             self.error(str(exc))
 
@@ -1073,10 +1011,6 @@ class MainWindow(QMainWindow):
         self.watch_table.set_rows(self.session.rows("watchlist", case_id) if case_id else [])
         self.findings_table.set_rows(findings)
         self.audit_table.set_rows(self.session.rows("audit")[:1000])
-        if self.session.role == "admin":
-            self.user_table.set_rows(self.session.rows("users"))
-        else:
-            self.user_table.set_rows([])
         self.metrics["cases"].setText(str(len(cases)))
         self.metrics["evidence"].setText(str(len(evidence)))
         self.metrics["findings"].setText(str(len(findings)))
