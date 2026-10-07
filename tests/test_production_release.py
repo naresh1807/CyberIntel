@@ -105,11 +105,17 @@ def test_production_gate_rejects_unqualified_release(gate):
         prepare.production_gate(environment, qualification)
 
 
-def test_deb_permissions_launcher_license_and_production_block(tmp_path):
+def test_deb_permissions_launcher_license_and_production_block(tmp_path, monkeypatch):
+    import time
+    epoch = int(time.time()) + 3600
+    monkeypatch.setenv('SOURCE_DATE_EPOCH', str(epoch))
     builder = module('build-cyberrecon-deb')
     with pytest.raises(ValueError, match='MAINTAINER'):
         builder.build(tmp_path / 'blocked', production=True)
     package = builder.build(tmp_path / 'valid')
+    archive = subprocess.check_output(['dpkg-deb', '--fsys-tarfile', str(package)])
+    with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+        assert all(member.mtime == epoch for member in members)
     module('check_release_security').check_deb(package)
     stage = tmp_path / 'stage'
     subprocess.run(['dpkg-deb', '-x', str(package), str(stage)], check=True)

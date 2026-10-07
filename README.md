@@ -2,7 +2,7 @@
 
 **Version 0.2.0** — authorized bug-bounty reconnaissance for owned infrastructure
 and explicitly permitted targets. **Production release: NOT APPROVED.**
-**Production APT repository: NOT YET AVAILABLE.**
+**Production APT repository: pending publication — NOT YET AVAILABLE.**
 
 Primary supported OS targets: **Kali Linux** and **Parrot Security**.
 Initial architecture: **amd64**. These are intended release targets; fresh desktop

@@ -1,0 +1,65 @@
+{
+  "commit": "c1cdeb473d3bbb7f8cdb5988d908e69634a68cc4",
+  "source_tree_dirty": true,
+  "application_version": "0.2.0",
+  "debian_revision": 5,
+  "architecture": "amd64",
+  "channel": "stable",
+  "component": "main",
+  "production_repository_url": null,
+  "production_fingerprint": null,
+  "development_repository": {
+    "status": "PASS",
+    "channel": "stable",
+    "component": "main",
+    "architecture": "amd64",
+    "versions": [
+      "0.2.0-5"
+    ],
+    "fingerprint": "9A0A07DA92FEBAADDAC19A94FB46922D34735C79",
+    "mode": "local metadata verification; public installation NOT TESTED"
+  },
+  "package_sha256": "da0416f418cd09e6c7ee62dfb2b1333f2dfee2337ae61f25fc5417effe535138",
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "421",
+    "time": "35.091",
+    "timestamp": "2026-10-07T06:46:01.433419-04:00",
+    "hostname": "kali"
+  },
+  "new_apt_test_cases": 11,
+  "local_apt_update": "PASS: isolated development file repository, authentication enabled",
+  "local_apt_policy": "PASS: candidate0.2.0-5, previous0.2.0-4 synthetic fixture visible",
+  "unsigned_rejection": "PASS: actual apt-get rejects unsigned fixture",
+  "clean_kali_install": "NOT TESTED: no privileged clean desktop VM",
+  "clean_parrot_install": "NOT TESTED: no suitable desktop VM",
+  "public_https_install": "BLOCKED: hosting unconfigured",
+  "upgrade_remove_reinstall_purge": "NOT TESTED against production APT",
+  "production_signing": "BLOCKED: operator key not provisioned",
+  "maintainer": "BLOCKED: real public identity unavailable",
+  "workflow_execution": "NOT TESTED",
+  "release_decision": "NOT APPROVED",
+  "files_changed": [
+    ".github/workflows/production-release.yml",
+    "README.md",
+    "docs/APT_REPOSITORY.md",
+    "docs/PRODUCTION_RELEASE_READINESS.md",
+    "docs/RELEASE_CHECKLIST.md",
+    "scripts/build-cyberrecon-apt.py",
+    "scripts/build-cyberrecon-deb.py",
+    "scripts/sign_cyberrecon_release.py",
+    "tests/test_production_release.py"
+  ],
+  "files_added": [
+    ".github/workflows/release-apt.yml",
+    "docs/APT_RELEASE_REPORT.md",
+    "docs/release-evidence/apt-production-phase.json",
+    "scripts/verify_cyberrecon_apt.py",
+    "tests/test_apt_repository.py"
+  ],
+  "report_hash_recursion_exclusion": "PASS: report excluded; rebuilt package remains byte-identical after report generation",
+  "reproducibility": "PASS: all staged timestamps normalized; repeated local SOURCE_DATE_EPOCH builds match"
+}

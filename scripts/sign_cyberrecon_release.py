@@ -19,7 +19,7 @@ def main():
     password = os.environ.get('APT_SIGNING_PASSPHRASE', '')
     fingerprint = os.environ.get('APT_SIGNING_FINGERPRINT', '')
     if not key or not password or not fingerprint:
-        parser.error('Protected production signing secrets and full fingerprint are required.')
+        parser.error('PRODUCTION SIGNING KEY REQUIRED. Protected production signing secrets and full fingerprint are required.')
     temporary_root = Path(os.environ.get('RUNNER_TEMP', tempfile.gettempdir())).resolve()
     if temporary_root == ROOT or ROOT in temporary_root.parents:
         parser.error('Signing temporary directory must be outside the repository.')

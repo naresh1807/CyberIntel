@@ -6,7 +6,7 @@ NOT APPROVED; no v0.2.0 tag has been created.
 
 ## Build
 
-- [x] Source tests pass (410; current working tree)
+- [x] Source tests pass (421; current working tree)
 - [x] Debian package builds (development candidate)
 - [x] Package contents validated (staging)
 - [x] SHA256 generated (development candidate)
@@ -170,3 +170,14 @@ public maintainer/license review, dependencies, independent public fingerprint,
 HTTPS reachability, default APT trust, protected environments/secrets, artifact
 checksums, release notes and rollback/rotation plan. Record failures as BLOCKED
 or NOT TESTED, not PASS. Do not use a container result as desktop proof.
+
+## APT distribution phase
+
+Production repository remains BLOCKED: public HTTPS hosting is not configured.
+Production signing remains BLOCKED: production key has not been provisioned.
+Clean Kali and Parrot installation through public APT: NOT TESTED.
+Existing tooling is reused by .github/workflows/release-apt.yml, with signed
+metadata verification and protected manual publication. Local Debian APT tests
+verify development signatures/candidate indexes and reject unsigned metadata;
+they do not install the package or certify production HTTPS.
+See [APT release report](APT_RELEASE_REPORT.md).

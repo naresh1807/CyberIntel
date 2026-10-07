@@ -1,6 +1,6 @@
 # CyberRecon v0.2.0 production release readiness
 
-Audit baseline: `c1fafb83048872023cc19fd6326b74283d980121`. This phase includes uncommitted final-gate
+APT phase baseline: `c1cdeb4`. Previous final-gate baseline: `c1fafb8`. This phase includes uncommitted final-gate
 changes and does not qualify an immutable production commit. Runtime and Go
 protocol: **0.2.0**. Candidate Debian package: **cyberrecon 0.2.0-5**.
 Compatibility Python distribution/desktop: **cyberintel-suite / CyberIntel 0.1.0**,
@@ -11,7 +11,7 @@ No debian/ tree exists; scripts/build-cyberrecon-deb.py generates Debian metadat
 
 | Gate | Status | Evidence |
 | --- | --- | --- |
-| Full test suite | PASS | .venv/bin/python -m pytest -q --junitxml artifacts/final-production-gate/pytest.xml: 410 passed, 0 failed, 0 skipped, 0 xfailed (37.88 seconds); baseline 404 passed (36.63 seconds). |
+| Full test suite | PASS | .venv/bin/python -m pytest -q --junitxml artifacts/apt-production-phase/pytest.xml: 421 passed, 0 failed, 0 skipped, 0 xfailed (35.52 seconds); earlier final-gate baseline 410 passed. |
 | Kali desktop | BLOCKED | Live Kali 2026.3 source GUI passed as UID1000 on XFCE/X11 Qt xcb; installed clean desktop VM is unavailable. No qemu-system-x86_64/virsh/VBoxManage or /dev/kvm; sudo -n true requires a password. Evidence: artifacts/final-production-gate/desktop/desktop.json. |
 | Parrot desktop | BLOCKED | No suitable Parrot Security amd64 desktop VM/environment available. Historical core-image package tests do not satisfy this gate. |
 | Fresh install | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
@@ -102,6 +102,18 @@ its public fingerprint and execute the trust/rotation/recovery checks.
 3. Run the candidate GitHub workflow, review every mandatory gate and exact-commit
 artifact, populate protected qualification evidence, then approve production
 publication. No tag or public release is authorized by incomplete evidence.
+
+
+## APT distribution phase
+
+Production repository remains BLOCKED: public HTTPS hosting is not configured.
+Production signing remains BLOCKED: production key has not been provisioned.
+Clean Kali and Parrot installation through public APT: NOT TESTED.
+Existing tooling is reused by .github/workflows/release-apt.yml, with signed
+metadata verification and protected manual publication. Local Debian APT tests
+verify development signatures/candidate indexes and reject unsigned metadata;
+they do not install the package or certify production HTTPS.
+See [APT release report](APT_RELEASE_REPORT.md).
 
 CYBERRECON v0.2.0 PRODUCTION RELEASE DECISION
 

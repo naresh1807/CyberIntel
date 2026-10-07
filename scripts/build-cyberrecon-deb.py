@@ -2,6 +2,7 @@
 """Build a distribution package without installing or modifying the host."""
 import argparse
 import importlib.util
+import os
 import shutil
 import re
 import subprocess
@@ -65,7 +66,7 @@ def build(output, worker=None, maintainer=None, production=False):
         shutil.copy2(ROOT / "CYBERRECON.md", documentation / "README.md")
         # Evidence hashes describe the finished archive and cannot be embedded
         # recursively inside that same archive.
-        shutil.copytree(ROOT / "docs", documentation / "docs", ignore=shutil.ignore_patterns("release-evidence", "__pycache__", "*.pyc"))
+        shutil.copytree(ROOT / "docs", documentation / "docs", ignore=shutil.ignore_patterns("release-evidence", "APT_RELEASE_REPORT.md", "__pycache__", "*.pyc"))
         (documentation / "workers").mkdir()
         shutil.copy2(ROOT / "workers/README.md", documentation / "workers/README.md")
         shutil.copy2(ROOT / "LICENSE", documentation / "copyright")
@@ -75,10 +76,18 @@ def build(output, worker=None, maintainer=None, production=False):
         if worker:
             executables.add(binaries / 'cyberrecon-dns')
         stage.chmod(0o755)
+        epoch = os.environ.get('SOURCE_DATE_EPOCH')
+        if epoch is not None:
+            if not epoch.isdecimal():
+                raise ValueError('SOURCE_DATE_EPOCH must be a nonnegative integer.')
+            epoch = int(epoch)
+            os.utime(stage, (epoch, epoch))
         for path in stage.rglob('*'):
             if path.is_symlink():
                 raise ValueError('Symlinks are not allowed in this package payload.')
             path.chmod(0o755 if path.is_dir() or path in executables else 0o644)
+            if epoch is not None:
+                os.utime(path, (epoch, epoch))
         subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(stage), str(destination)], check=True, timeout=120)
     return destination
 
