@@ -59,7 +59,12 @@ def email(value):
 
 
 def public_address(host):
-    addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    try:
+        ipaddress.ip_address(host)
+        dns_host = host
+    except ValueError:
+        dns_host = host.rstrip(".") + "."
+    addresses = socket.getaddrinfo(dns_host, 443, type=socket.SOCK_STREAM)
     if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
         raise ValidationError("HTTP collection permits only public Internet addresses.")
     return addresses[0][4][0]
@@ -185,8 +190,25 @@ class Collector:
         return self.config.endpoints[name].rstrip("/")
 
     def collect(self, source, target="", force=False):
-        # Key fingerprint isolates cached privileged results when credentials change.
-        scope = hashlib.sha256(json.dumps(self.keys, sort_keys=True).encode()).hexdigest()
+        try:
+            if source in {"dns", "ct", "ct_primary", "certspotter", "website", "hibp_domain"}:
+                target = domain(target)
+            elif source == "hibp_email":
+                target = email(target)
+            elif source in {"rdap", "otx", "urlhaus"}:
+                _, target = indicator(target)
+            elif source in {"hibp_catalog", "urlhaus_recent"}:
+                target = ""
+            else:
+                target = target.strip()
+        except ValueError as exc:
+            return Result(source, self.config.endpoints.get(source, ""), target, None,
+                          status="unavailable", freshness="unknown", error=str(exc))
+        # Public caches survive credential edits; privileged caches remain key-isolated.
+        names = ("hibp",) if source in {"hibp_email", "hibp_domain"} else (
+            ("otx",) if source == "otx" else ("urlhaus",) if source.startswith("urlhaus") else
+            ("twilio_account_sid", "twilio_key_sid", "twilio_key_secret") if source.startswith("twilio_") else ())
+        scope = hashlib.sha256(json.dumps({name: self.keys.get(name, "") for name in names}, sort_keys=True).encode()).hexdigest()
         key = hashlib.sha256(json.dumps([source, target, scope, self.config.endpoints], sort_keys=True).encode()).hexdigest()
         cached = self.store.cache_get(key)
         if cached:
@@ -245,7 +267,7 @@ class Collector:
                     records[record_type] = [r.to_text() for r in resolver.resolve(host + ".", record_type, search=False)]
                 except dns.resolver.NoAnswer:
                     records[record_type] = []
-                except dns.exception.DNSException as exc:
+                except (dns.exception.DNSException, OSError) as exc:
                     errors[record_type] = type(exc).__name__
             if not records:
                 raise RuntimeError("DNS lookup failed: " + json.dumps(errors))
@@ -342,6 +364,7 @@ class Collector:
             key = self.keys.get("hibp", "")
             headers = {"hibp-api-key": key} if key else {}
             if source == "hibp_catalog":
+                headers = {}
                 url = self.endpoint("hibp") + "/breaches"
             else:
                 if not key:

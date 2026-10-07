@@ -1,5 +1,7 @@
 # CyberIntel Suite
 
+The new **CyberRecon** entry point implements an initial portion of the advanced reconnaissance specification. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon.cli --help` or launch the desktop with `.venv/bin/python -m cyberrecon.cli`.
+
 For step-by-step instructions, see the [User Manual](USER_MANUAL.md).
 
 A modular Python desktop application for public intelligence collection and authorized offline forensic analysis. The PySide6 interface uses a dark purple, blue and charcoal palette with case selection, sortable/filterable tables, background jobs and PyQtGraph charts. No fixture data is loaded into a user's workspace automatically.
@@ -84,6 +86,102 @@ Filter/sort the table, then use **Check DNS for filtered names (max 100)** to re
 
 Run `.venv/bin/python scripts/check_subdomains.py` for an optional public example.com check. The initial enhanced live check encountered HTTP 502 from crt.sh; see `artifacts/live-subdomain-check.json` for the latest outcome. Unit/integration checks use deterministic CT/DNS fixtures, including malformed sources, legacy caches, source failures, filtering, export and case persistence. `artifacts/subdomain-discovery-synthetic.png` is explicitly synthetic visual QA.
 
+## Wi-Fi / LAN device discovery
+
+Open **Wi-Fi / LAN devices**, click **Detect local networks**, and select your
+interface's subnet. Automatic detection uses Linux `iproute2`; on other systems,
+enter the local IPv4 subnet manually, such as `192.168.1.0/24`. Confirm permission
+and click **Scan devices**. Nmap must be installed and available on PATH.
+
+The page shows the number of responding devices, IP addresses, MAC addresses when
+available, vendors reported by Nmap, and discovery/MAC attribution. It runs a
+bounded Nmap `-sn -n` host-discovery scan without service or vulnerability scans,
+with a 120-second limit and at most 1,024 addresses per batch. Only RFC1918 private
+IPv4 subnets are accepted. Nmap's ARP discovery may require appropriate platform
+permissions or Npcap on Windows; the app does not automatically elevate itself.
+Linux local-interface and neighbor-cache metadata can fill missing MAC addresses
+for responding hosts. Neighbor-cache attribution is explicitly marked as possibly
+stale. Missing MAC addresses display **Unavailable**.
+
+This is a Wi-Fi/LAN discovery count, not an authoritative wireless association
+count. Wired devices, the router and this computer may appear; sleeping devices,
+firewalls, VLANs and client isolation can hide devices. MAC addresses generally
+cannot be learned across routers. Check your router's client list for the exact
+Wi-Fi association list. IPv6-only devices are outside this discovery workflow.
+
+Use **Export devices CSV** to save the discovered list with subnet and observation
+timestamp. With an active case, findings are saved automatically, included in case
+reports, and can be restored from **Reports & audit**.
+
+## Social profile links from authorized directories
+
+Open **Social profile links**, select a case, and import a contact CSV/XLSX through
+**Import contact directory**. The file needs `profile_url` plus `email` and/or
+`phone`; `display_name` is optional. Choose Email or International phone, enter the
+identifier, confirm directory-use permission, and click **Find supplied profile
+links**. A labeled synthetic example is in `examples/synthetic_contacts.csv`.
+
+This matches supplied records offline; it does not discover unknown accounts using
+private contact information or enumerate social account-recovery endpoints. Email
+matching ignores case and surrounding whitespace. Phone matching normalizes common
+separators and requires +country-code format. Matched links must be HTTPS/443 on
+LinkedIn, Facebook, Instagram, X/Twitter, TikTok, GitHub or YouTube, with a nonempty
+path and no query/fragment/embedded credentials. Unsupported links and malformed
+contacts are reported as coverage warnings. Legacy Facebook query-based links need
+a canonical path-based link in the directory.
+
+Results display the supplied name, platform, link, matching basis and source rows;
+unrelated contacts and extra columns are excluded from findings. Duplicate
+link/name pairs are consolidated. Matches do not independently verify identity,
+ownership or current account availability. No match means none in that directory.
+Evidence hashes are checked before and after lookup, and case findings, JSON/CSV
+exports and restoration preserve source/provenance. **Open selected link in
+browser** opens a validated supplied link; doing so contacts that platform.
+
+## Web application assessment
+
+Open **Web application assessment**, enter a public HTTPS URL on port 443, confirm
+permission, and click **Assess web application**. The module includes:
+
+- Header review: HSTS, CSP, framing protection, nosniff, referrer and permissions
+  policies, and observed server disclosure.
+- Cookie attribute review: Secure, HttpOnly and SameSite. Cookie values are omitted
+  from saved findings and exports; requirements depend on each cookie's purpose.
+- TLS certificate review: verified hostname/chain, expiry, negotiated protocol and
+  cipher. This is one connection, not enumeration of all supported TLS settings.
+- Optional `/.well-known/security.txt` check: presence, contact-field basics and
+  nonexpired Expires. This is not full RFC conformance or signature validation.
+- Optional CORS checks: two GET requests with different reserved test Origin
+  headers observe reflection, wildcard policies and credential flags. Public
+  sharing can be intentional; authenticated impact is not tested.
+- Optional HTTP method review: OPTIONS reads advertised Allow methods. It does not
+  execute advertised write, TRACE or CONNECT methods.
+- Deeper CSP review flags report-only mode, duplicate directives and broad script
+  sources. Cookie review also checks __Host-/__Secure- prefix requirements.
+
+The module uses bounded GET responses (256 KiB), TLS verification, public-address
+validation, pinned HTTPS connections, and at most four redirect responses per
+request. CORS and OPTIONS checks are off by default. Requests share a nominal
+120-second budget; operating-system DNS and a TLS handshake can extend completion.
+Redirects to another host or HTTP are rejected. URLs cannot include
+credentials, query strings or fragments. No provider keys or subscriptions are
+needed. Page bodies and raw Set-Cookie headers are not saved. Missing policies are
+review items, not confirmed exploitable vulnerabilities; presence does not prove
+secure configuration. HTTP error pages are not used to assess application headers.
+Independent check failures retain successful findings with explicit warnings.
+Results include the selected-check configuration and a findings/review/warning
+summary. There is no numeric security score or claim of comprehensive coverage.
+
+Results support filtering, full JSON/CSV export, case reports, and restoring saved
+assessments. This release checks public HTTPS/443 applications only; local test
+servers, authenticated sessions, crawling and exploit testing are outside this
+module's scope.
+
+References: [OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html),
+[RFC 9116 security.txt](https://www.rfc-editor.org/rfc/rfc9116.html),
+[OWASP CORS testing](https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/11-Client-side/07-Cross_Origin_Resource_Sharing/),
+[RFC 9110 HTTP methods](https://www.rfc-editor.org/rfc/rfc9110.html).
+
 ## Twilio phone lookup
 
 In Settings, enter your Twilio Account SID (AC...), API key SID (SK...), and API key secret. Use a replacement key if a secret has been exposed; never put credentials in source code or chat. In Phone region estimate, enter a digits-only number with a +country code, confirm authorization to send it to Twilio, then click **Twilio phone lookup**. Validation is the default. Enable **Include carrier/type lookup** to request the additional package; provider charges and coverage restrictions apply. Live requests authenticate using the API key SID/secret over HTTPS. Case findings contain only allowed lookup metadata, not credentials.
@@ -92,7 +190,7 @@ The [Twilio Line Type Intelligence API](https://www.twilio.com/docs/lookup/v2-ap
 
 ## Input schemas
 
-Column names are normalized to lowercase. CSV and XLSX imports are limited to 50 MiB and 100,000 rows; expanded XLSX content is limited to 150 MiB. XLSX files with VBA content are rejected. The first worksheet is used. Phone columns are read as strings to preserve leading zeros and `+` signs.
+Column names are normalized to lowercase, with spaces/hyphens converted to underscores. Comma, semicolon and tab delimiters are detected for CSV imports; surrounding cell whitespace is trimmed. CSV and XLSX imports are limited to 50 MiB and 100,000 rows; expanded XLSX content is limited to 150 MiB. XLSX files with VBA content are rejected. The first worksheet is used. Phone columns are read as strings to preserve leading zeros and `+` signs.
 
 **CDR**: `caller,callee,timestamp,duration_seconds,direction`
 
@@ -101,7 +199,7 @@ Column names are normalized to lowercase. CSV and XLSX imports are limited to 50
 - `duration_seconds`: finite, nonnegative number, at most 604800 seconds.
 - `direction`: `incoming` or `outgoing`, relative to the supplied record's subscriber context. Edges always run caller → callee.
 
-Reports include total/mean duration, call counts, unique numbers, directional counts, daily/hourly UTC frequency and weighted relationships. Plotly graphs show association edges; the relationship table provides direction and frequency. Graph rendering is limited to 2,000 edges.
+Reports include total/mean duration, call counts, unique numbers, directional counts, daily/hourly UTC frequency and weighted relationships. Plotly graphs show association edges; the relationship table provides direction and frequency. Larger graphs display the 2,000 relationships with highest call counts, with explicit coverage in the title. The table and full JSON retain all relationships.
 
 **GPS/location**: `latitude,longitude,timestamp,source,record_kind`
 
@@ -111,7 +209,7 @@ Reports include total/mean duration, call counts, unique numbers, directional co
 
 **Cell towers**: `tower_id,latitude,longitude,source`
 
-Tower markers describe infrastructure, not subscriber positions. Maps are limited to 10,000 records. Actual, inferred, synthetic and tower records have distinct colors. No device location is inferred from a phone number or IP address.
+Tower markers describe infrastructure, not subscriber positions. Maps display up to 10,000 records; larger datasets use an explicitly labeled, evenly spaced sample in input order. The table and full JSON retain every record. Actual, inferred, synthetic and tower records have distinct colors. No device location is inferred from a phone number or IP address.
 
 ### Phone numbering region estimate
 
@@ -162,6 +260,9 @@ cyberintel/
   analysis.py     CDR, geospatial and offline TShark services
   phone.py        Offline phone numbering-region estimates, no device tracking
   subdomains.py   Passive discovery, bounded DNS checks and CSV export
+  wifi_scan.py    Local IPv4 device discovery, MAC attribution and CSV export
+  web_assessment.py  Authorized HTTPS header, cookie, certificate and disclosure review
+  social_profiles.py  Offline profile-link matching in authorized contact directories
   reporting.py    Case snapshot and PDF/CSV writers
 examples/         Configuration and explicit synthetic datasets
 scripts/          Linux install/build and reproducible verification
@@ -173,6 +274,46 @@ pyproject.toml    Dependencies and desktop CLI
 ```
 
 Modules do not depend on the desktop UI. `Result` carries attribution, timestamps, status, freshness and errors. `Session` enforces service permissions. The SQLite repository opens a connection per operation with foreign keys and WAL enabled, making worker calls safe. Schema version is 1. Database I/O is contained in `storage.py` with small monitor bookkeeping in the UI; a future PostgreSQL backend requires replacing the repository/transactions and implementing migrations. PostgreSQL is not selectable in this release.
+
+## Collection recovery and coverage
+
+Cache lookup normalizes equivalent domain/email/IP inputs. Public caches survive
+credential edits; privileged caches are isolated by the relevant provider's keys,
+so changing an unrelated key does not discard usable responses. A failed refresh
+still returns available cached data labeled stale, with the collection error and
+original timestamp. Existing caches from the prior key scheme refresh once.
+Public HIBP catalog requests do not send a subscription key. DNS collection keeps
+successful record families if another query fails with a socket error.
+
+On interfaces whose subnet exceeds the scan limit, local network detection offers
+the /24 containing this computer. The UI labels it as a suggested batch within the
+larger network; other batches are outside that scan. Choose additional authorized
+subnets manually when needed.
+
+## Tool readiness and module exports
+
+In **Settings**, use **Check tool readiness** to inspect Python packages, Nmap,
+TShark, Linux `ip`, and provider credential configuration. This local check never
+submits credentials or tests paid APIs. An installed executable or configured key
+does not prove provider access or sufficient scan permissions.
+
+Every result module offers **Export full JSON** and **Export filtered CSV**. JSON
+preserves the complete result, including summaries, warnings, source references,
+status and collection time. CSV exports the visible sorted/filtered table with
+prefixed provenance columns; nested values are JSON encoded, and cells receive
+formula-injection protection. Empty results retain a provenance-only row. Failed
+exports preserve existing files, and managed evidence/state cannot be overwritten.
+Exports work without selecting a case, subject to report permission; case reports
+continue to include only stored findings.
+
+In **Wi-Fi / LAN devices**, select a discovered device and click **Inspect selected
+device ports** to load its IP in **Nmap IP scan**. Confirm scan permission before
+starting the service scan. This action does not automatically initiate a scan or
+enable external vulnerability lookups.
+
+Restoring live or cached findings reevaluates their freshness at the current time;
+the historical stored finding remains unchanged. A previously stale result stays
+stale. Workspace log failures now produce an actionable startup error.
 
 ## Phases and verification
 

@@ -21,6 +21,10 @@ CyberIntel is a desktop tool for public infrastructure lookups, authorized phone
 13. [Geospatial analysis](#13-geospatial-analysis)
 14. [Reports, saved findings, and status](#14-reports-saved-findings-and-status)
 15. [Troubleshooting and backups](#15-troubleshooting-and-backups)
+16. [Wi-Fi and LAN devices](#16-wi-fi-and-lan-devices)
+17. [Tool readiness and module exports](#17-tool-readiness-and-module-exports)
+18. [Web application assessment](#18-web-application-assessment)
+19. [Social profile links](#19-social-profile-links)
 
 ## 1. Install, start, and update
 
@@ -206,9 +210,9 @@ caller,callee,timestamp,duration_seconds,direction
 
 Numbers use 3–20 digits with optional leading `+`. Timestamps need an offset, for example `2026-10-05T10:00:00+05:30`. Duration is a finite nonnegative number; direction is `incoming` or `outgoing` in the supplied subscriber context.
 
-Results include call counts, total/mean duration, directional counts, hourly/daily UTC activity, and weighted caller-to-callee relationships. **Open relationship graph** opens an HTML graph in your browser. Graphs are limited to 2,000 edges.
+Results include call counts, total/mean duration, directional counts, hourly/daily UTC activity, and weighted caller-to-callee relationships. **Open relationship graph** opens an HTML graph in your browser. For more than 2,000 relationships, the graph shows the highest call counts and labels its coverage. Full data remains in the table and JSON export.
 
-CSV/XLSX analysis accepts up to 50 MiB and 100,000 rows. Use `.xlsx`, not legacy `.xls`; macros are rejected, and only the first worksheet is read.
+CSV/XLSX analysis accepts up to 50 MiB and 100,000 rows. CSV files can use commas, semicolons or tabs. Header spaces/hyphens become underscores, and surrounding cell whitespace is trimmed. Use `.xlsx`, not legacy `.xls`; macros are rejected, and only the first worksheet is read.
 
 ## 12. Network forensics
 
@@ -236,7 +240,7 @@ tower_id,latitude,longitude,source
 
 Use valid coordinate ranges and timezone-aware timestamps for location records. Location kinds are `actual`, `inferred`, or `synthetic`; the import classification can restrict how records are labeled.
 
-Click **Open location map** to open an HTML map in your browser. Marker colors distinguish provenance and infrastructure. Maps support up to 10,000 records. Tower coordinates identify infrastructure, not a subscriber's position. No coordinates are generated from a phone number or IP address.
+Click **Open location map** to open an HTML map in your browser. Marker colors distinguish provenance and infrastructure. Larger datasets display a labeled sample of 10,000 records evenly spaced in input order. Full data remains in the table and JSON export. Tower coordinates identify infrastructure, not a subscriber's position. No coordinates are generated from a phone number or IP address.
 
 OpenStreetMap tiles are optional and make external browser requests. Folium's map assets also use public CDNs, so fully disconnected maps need additional asset preparation.
 
@@ -293,3 +297,114 @@ Close the app before backing up the entire data directory, including the databas
 For support, provide the module, operation, target type, app commit (`git log -1 --oneline`), and exact displayed error. Hide credentials and unnecessary personal information in screenshots. Logs are in `application.log` in the selected data directory; they may contain less detail than the on-screen error.
 
 Live paid Twilio access, credentialed provider subscriptions, and actual Nmap scans have not been verified with your Kali account. Test a small authorized lookup first and assess the source and timestamp before relying on a result.
+
+## 16. Wi-Fi and LAN devices
+
+1. Open **Wi-Fi / LAN devices** in the sidebar.
+2. Click **Detect local networks** and choose the subnet for your Wi-Fi interface,
+   or enter an IPv4 subnet such as `192.168.1.0/24` manually. Detection uses Linux
+   `iproute2`; Windows users can find their IPv4 address and subnet mask with
+   `ipconfig` and enter the corresponding CIDR subnet.
+3. Confirm that you own the network or have permission to discover its devices.
+   If the detected subnet is larger than the scan limit, a suggested /24 batch
+   containing this computer is offered and labeled. Other batches are not scanned.
+4. Click **Scan devices**. The background scan uses Nmap host discovery and stops
+   after 120 seconds. Private IPv4 subnets with at most 1,024 addresses are accepted.
+5. Read the discovered-device count and IP, MAC, vendor and status columns. Missing
+   MAC addresses display **Unavailable**. Linux neighbor-cache MAC values are
+   marked as possibly stale; they are used only for hosts that responded.
+6. Use **Export devices CSV** to export the list. With a selected case, scans are
+   saved automatically and can be restored from **Reports & audit**.
+
+Discovery includes responding devices on the local segment, potentially including
+wired devices, the router and this computer. Devices blocked by client isolation,
+firewalls, VLANs or sleep may be absent. IPv6-only devices are not scanned. One
+device can have several IP addresses. This count is not an exact count of Wi-Fi
+associations; use the router's client list for that. MAC discovery depends on local
+network visibility and Nmap/platform permissions. The app does not elevate itself.
+
+## 17. Tool readiness and module exports
+
+Open **Settings** and click **Check tool readiness** to see installed dependencies,
+available external executables, and saved provider credential configuration. The
+check is local: it does not contact providers or validate subscriptions. Missing
+Nmap affects IP scans and Wi-Fi/LAN discovery; missing TShark affects PCAP analysis;
+missing Linux `ip` affects automatic subnet/MAC detection.
+
+Each result module includes two export actions:
+
+- **Export full JSON** keeps the entire result, summaries, errors, warnings and
+  original source/time/status information, regardless of the table filter.
+- **Export filtered CSV** saves visible rows in their current sort order, with
+  provenance columns beginning with `_`. Nested values are JSON encoded. With no
+  visible rows, the CSV contains one provenance-only row.
+
+Exports protect application state and managed evidence. They do not need an active
+case; case reports require saved case findings. Sensitive authorized queries and
+result data remain in exports, so choose a suitable destination.
+
+For service details of a discovered device, select it in **Wi-Fi / LAN devices**
+and click **Inspect selected device ports**. Its IP opens in **Nmap IP scan**.
+Confirm permission and start the scan there. No scan or vulnerability lookup starts
+automatically.
+
+Restored live/cached findings show freshness relative to their original collection
+time. Stale results remain stale; reopening a finding does not refresh a provider.
+
+## 18. Web application assessment
+
+1. Select a case if you want to retain the assessment in case history.
+2. Open **Web application assessment** and enter the public HTTPS application URL,
+   for example `https://example.com/app`. Port 443 is required. Credentials, query
+   strings and fragments are not accepted.
+3. Confirm that you own the application or have permission to assess it.
+4. Choose whether to inspect its TLS certificate and security.txt disclosure file.
+   Optionally enable CORS to send two additional GETs with reserved test origins,
+   or HTTP methods to send OPTIONS and inspect advertised capabilities. These
+   extra checks are off by default.
+5. Click **Assess web application**. Read the check, status, evidence and
+   recommendation columns; filter review items to prioritize follow-up.
+6. Export full JSON or filtered CSV, or restore a saved assessment from Reports.
+
+The assessment reviews security headers and cookie attributes on one page. TLS
+checking verifies the hostname/chain and reports expiry plus the negotiated
+connection; it does not enumerate cipher suites. security.txt checking reviews
+basic Contact/Expires fields and is not a full conformance test. Individual check
+failures appear as warnings while successful findings remain available.
+
+CSP review includes report-only policies, duplicate directives and broad script
+sources. Cookie review includes __Host-/__Secure- prefix requirements. The result
+summary shows finding, review-item and warning counts, and exports retain the
+selected-check configuration. Requests use a nominal 120-second shared budget;
+OS DNS resolution and TLS completion can extend elapsed time.
+
+CORS observations require checking the application's trust model and authenticated
+data before claiming impact. OPTIONS lists advertised methods; the assessment does
+not execute them. A wildcard credential policy is rejected by browsers and is not
+proof of credential theft. Review items remain contextual findings, not confirmed
+exploitable vulnerabilities.
+
+Requests stay on the authorized hostname. Cross-host/downgrade redirects and
+nonpublic addresses are rejected. Page bodies and cookie values are not saved.
+Missing headers and cookie attributes require contextual analyst review; these
+observations are not confirmed vulnerabilities. Different routes and authenticated
+sessions may behave differently. Live assessment has not been verified against
+your application; automated checks use controlled responses.
+
+## 19. Social profile links
+
+1. Create/select a case, then open **Social profile links**.
+2. Import a contact directory you own or are authorized to use. CSV/XLSX columns
+   are `profile_url`, `email` and/or `phone`, with optional `display_name`.
+3. Choose Email or International phone and enter the identifier. Phones need a
+   leading +country code. Email matching ignores case; phone separators are removed.
+4. Confirm directory-use permission and click **Find supplied profile links**.
+5. Review source rows, supplied names and links. Invalid entries appear as warnings.
+6. Export JSON/CSV or restore the saved finding from Reports & audit.
+
+Supported link hosts are LinkedIn, Facebook, Instagram, X/Twitter, TikTok, GitHub and
+YouTube (base/www hosts). Use HTTPS path-based links without queries or fragments.
+The lookup runs offline and returns only records in the supplied directory. It
+does not verify identity, ownership, profile availability or absence of accounts.
+**Open selected link in browser** contacts the platform only when you click it.
+Use `examples/synthetic_contacts.csv` as a labeled synthetic workflow example.

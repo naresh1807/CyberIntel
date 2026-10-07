@@ -29,13 +29,13 @@ def test_gui_navigation_and_persistence(session, examples, tmp_path):
     app = QApplication.instance() or QApplication([])
     app.setStyleSheet(STYLE)
     window = MainWindow(Config(tmp_path), session)
-    assert window.pages.count() == 13
+    assert window.pages.count() == 16
     case_id = session.create_case("UI synthetic investigation")
     session.add_evidence(case_id, examples / "synthetic_cdr.csv", "Fixture", "2026-10-01T00:00:00Z", "synthetic")
     window.reload_cases(case_id)
     assert window.active_case() == case_id
     assert window.cdr_controls["selector"].count() == 1
-    for index in range(12):
+    for index in range(window.pages.count()):
         window.navigation.setCurrentRow(index)
         assert window.pages.currentIndex() == index
     result = analyze_cdr(examples / "synthetic_cdr.csv", "synthetic")

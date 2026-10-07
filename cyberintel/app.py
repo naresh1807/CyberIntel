@@ -23,12 +23,19 @@ def main():
     except (ValueError, OSError) as exc:
         print(f"CyberIntel Suite could not start: {exc}", file=sys.stderr)
         return 1
-    handler = RotatingFileHandler(config.home / "application.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    handler = None
+    try:
+        handler = RotatingFileHandler(config.home / "application.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+        os.chmod(config.home / "application.log", 0o600)
+    except OSError as exc:
+        if handler is not None:
+            handler.close()
+        print(f"CyberIntel Suite could not start: Unable to open the workspace log: {exc}", file=sys.stderr)
+        return 1
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger = logging.getLogger("cyberintel")
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
-    os.chmod(config.home / "application.log", 0o600)
     app = QApplication(sys.argv[:1])
     app.setApplicationName("CyberIntel Suite")
     app.setStyle("Fusion")

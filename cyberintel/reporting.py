@@ -19,6 +19,36 @@ def csv_safe(value):
     return "'" + value if value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else value
 
 
+def export_result(session, module, result, destination, kind="json", rows=None):
+    """Export a full attributed result or a filtered table with provenance."""
+    session.check("report")
+    if kind not in {"json", "csv"}:
+        raise ValidationError("Choose JSON or CSV for a module export.")
+    destination = validate_export_destination(session, destination)
+    with atomic_output(destination) as temporary:
+        if kind == "json":
+            with temporary.open("w", encoding="utf-8") as file:
+                json.dump({"module": module, "result": result.to_dict()}, file, ensure_ascii=False, indent=2, allow_nan=False)
+        else:
+            rows = list(rows or [])
+            # Prefix metadata so provider columns cannot overwrite attribution.
+            metadata = {"_module": module, "_source": result.source, "_reference": result.reference,
+                        "_query": result.query, "_collected_at": result.collected_at,
+                        "_status": result.status, "_freshness": result.freshness, "_error": result.error or ""}
+            if any(set(row) & set(metadata) for row in rows):
+                raise ValidationError("Table columns conflict with export provenance fields. Use JSON export.")
+            fields = list(metadata) + list(dict.fromkeys(key for row in rows for key in row))
+            with temporary.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=fields)
+                writer.writeheader()
+                for row in rows or [{}]:
+                    values = {**metadata, **row}
+                    writer.writerow({key: csv_safe(json.dumps(value, ensure_ascii=False, allow_nan=False)
+                        if isinstance(value, (dict, list)) else value) for key, value in values.items()})
+    session.audit("module_exported", f"{module}: {kind.upper()}")
+    return str(destination)
+
+
 def case_snapshot(session, case_id):
     session.check("report")
     case = next((r for r in session.rows("cases") if r["id"] == case_id), None)

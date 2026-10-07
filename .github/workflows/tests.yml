@@ -10,7 +10,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y tshark libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+      - run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y tshark nmap libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
       - run: python -m pip install -e '.[dev]'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+      - run: go test -race ./...
+        working-directory: workers/dns
+      - run: |
+          mkdir -p dist
+          cd workers/dns
+          go build -trimpath -o ../../dist/cyberrecon-dns .
       - run: python -m pytest -q
       - run: python scripts/verify_demo.py
+      - run: python scripts/verify_cyberrecon_lab.py --tls

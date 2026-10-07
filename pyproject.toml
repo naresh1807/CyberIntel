@@ -19,10 +19,10 @@ dev = ["pytest>=8", "pyinstaller>=6"]
 
 [project.scripts]
 cyberintel = "cyberintel.app:main"
+cyberrecon = "cyberrecon.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["cyberintel*"]
+include = ["cyberintel*", "cyberrecon*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-

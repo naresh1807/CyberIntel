@@ -17,9 +17,13 @@ from .connectors import Collector, domain, email
 from .models import Result, ValidationError, utcnow
 from .phone import estimate_phone_region
 from .nmap_scan import scan_ips
+from .wifi_scan import local_networks, scan_devices, export_devices, NOTE as WIFI_NOTE
 from .subdomains import discover_subdomains, verify_subdomains, enrich_subdomains, export_subdomains
 from .output import validate_export_destination
-from .reporting import export_csv, export_pdf
+from .reporting import export_csv, export_pdf, export_result
+from .diagnostics import readiness
+from .web_assessment import assess_web
+from .social_profiles import lookup_profiles, profile_link
 from .security import LocalCredentials
 
 STYLE = """
@@ -161,7 +165,7 @@ class Job(QRunnable):
 
 class MainWindow(QMainWindow):
     collection_progress = Signal(str, object)
-    PAGE_NAMES = ["Overview", "Live OSINT", "Breach intelligence", "Threat intelligence", "CDR analysis", "Network forensics", "Geospatial", "Phone region estimate", "Cases & evidence", "Reports & audit", "Settings", "Subdomain discovery", "Nmap IP scan"]
+    PAGE_NAMES = ["Overview", "Live OSINT", "Breach intelligence", "Threat intelligence", "CDR analysis", "Network forensics", "Geospatial", "Phone region estimate", "Cases & evidence", "Reports & audit", "Settings", "Subdomain discovery", "Nmap IP scan", "Wi-Fi / LAN devices", "Web application assessment", "Social profile links"]
 
     def __init__(self, config, session):
         super().__init__()
@@ -244,6 +248,10 @@ class MainWindow(QMainWindow):
         self.build_settings()
         self.build_subdomains_page()
         self.build_nmap_page()
+        self.build_wifi_page()
+        self.build_web_page()
+        self.build_profiles_page()
+        self.add_module_exports()
         self.navigation.currentRowChanged.connect(self.navigate)
         self.navigation.setCurrentRow(0)
         self.reload_cases()
@@ -364,6 +372,241 @@ class MainWindow(QMainWindow):
             self.feed_enabled = QCheckBox("Update URLhaus recent feed for active case every 15 minutes while open")
             self.feed_enabled.toggled.connect(lambda checked: self.feed_timer.start() if checked else self.feed_timer.stop())
             layout.addWidget(self.feed_enabled)
+
+    def build_profiles_page(self):
+        layout = self.page("Match an email or international phone number against profile links in an authorized contact directory attached to your case.")
+        row = QHBoxLayout()
+        selector = QComboBox()
+        row.addWidget(selector, 1)
+        row.addWidget(self.button("Import contact directory", self.import_evidence))
+        layout.addLayout(row)
+        self.profile_kind = QComboBox()
+        self.profile_kind.addItem("Email", "email")
+        self.profile_kind.addItem("International phone", "phone")
+        self.profile_query = QLineEdit()
+        self.profile_query.setPlaceholderText("Email or +country-code phone number")
+        row = QHBoxLayout()
+        row.addWidget(self.profile_kind)
+        row.addWidget(self.profile_query, 1)
+        layout.addLayout(row)
+        self.profile_authorized = QCheckBox("I am authorized to use this contact directory for this lookup")
+        layout.addWidget(self.profile_authorized)
+        layout.addWidget(self.button("Find supplied profile links", self.run_profile_lookup, True))
+        layout.addWidget(self.button("Open selected link in browser", self.open_profile_link))
+        note = QLabel("CSV/XLSX columns: profile_url, email and/or phone; optional display_name. This searches supplied records offline. A matching record does not independently verify identity, profile ownership or account availability.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        status = QLabel("Select a case and attach an authorized contact directory.")
+        status.setWordWrap(True)
+        layout.addWidget(status)
+        table, raw = DataTable("Filter platform, supplied name or profile link…"), QTextEdit()
+        raw.setReadOnly(True)
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(table)
+        split.addWidget(raw)
+        split.setSizes([450, 150])
+        layout.addWidget(split, 1)
+        self.profiles_controls = {"selector": selector, "status": status, "table": table, "raw": raw}
+
+    def open_profile_link(self):
+        row = self.profiles_controls["table"].selected()
+        if not row:
+            return self.error("Select a supplied profile link first.")
+        try:
+            self.session.check("read")
+            _, link = profile_link(row["profile_url"])
+            if not QDesktopServices.openUrl(QUrl(link)):
+                self.error("Unable to open the profile link in your browser.")
+        except (ValueError, KeyError, PermissionError) as exc:
+            self.error(str(exc))
+
+    def run_profile_lookup(self):
+        case_id = self.need_case()
+        if not case_id:
+            return
+        evidence = self.profiles_controls["selector"].currentData()
+        if not evidence:
+            return self.error("Import and select a contact directory first.")
+        query, kind, authorized = self.profile_query.text(), self.profile_kind.currentData(), self.profile_authorized.isChecked()
+        def task():
+            self.session.check("collect")
+            from .analysis import sha256
+            if sha256(evidence["path"]) != evidence["sha256"]:
+                raise ValidationError("Evidence hash mismatch. Profile lookup refused.")
+            result = lookup_profiles(evidence["path"], query, kind, authorized, evidence["data_kind"])
+            if result.data["file_sha256"] != evidence["sha256"] or sha256(evidence["path"]) != evidence["sha256"]:
+                raise ValidationError("Contact directory changed during lookup. Results were not saved.")
+            result.reference = "evidence:" + evidence["id"]
+            result.data.update(evidence_source=evidence["source"], acquired_at=evidence["acquired_at"])
+            self.session.save_finding(case_id, "profiles", result)
+            return result
+        self.start_job("Matching supplied social profile links", task, lambda result: self.show_result("profiles", result))
+
+    def build_web_page(self):
+        layout = self.page("Authorized web configuration review: security headers, cookie flags, TLS certificate and vulnerability disclosure metadata.")
+        self.web_target = QLineEdit()
+        self.web_target.setPlaceholderText("Public HTTPS URL, e.g. https://example.com/ (port 443)")
+        layout.addWidget(self.web_target)
+        self.web_authorized = QCheckBox("I own this web application or have permission to assess it")
+        self.web_tls = QCheckBox("Inspect TLS certificate and negotiated connection")
+        self.web_tls.setChecked(True)
+        self.web_security_txt = QCheckBox("Check /.well-known/security.txt on this host")
+        self.web_security_txt.setChecked(True)
+        self.web_cors = QCheckBox("CORS check: send two additional GET requests with reserved test Origin headers")
+        self.web_methods = QCheckBox("HTTP methods: send OPTIONS and review advertised Allow methods")
+        for widget in (self.web_authorized, self.web_tls, self.web_security_txt, self.web_cors, self.web_methods):
+            layout.addWidget(widget)
+        layout.addWidget(self.button("Assess web application", self.run_web_assessment, True))
+        note = QLabel("Reviews one page on a public HTTPS host, with same-host redirects only. Findings are configuration observations requiring validation. Cookie values and page bodies are not saved. Other application routes and authenticated behavior need separate assessment.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        status = QLabel("Ready • Enter a URL and confirm assessment permission.")
+        status.setWordWrap(True)
+        layout.addWidget(status)
+        table, raw = DataTable("Filter check, status, evidence or recommendation…"), QTextEdit()
+        raw.setReadOnly(True)
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(table)
+        split.addWidget(raw)
+        split.setSizes([450, 150])
+        layout.addWidget(split, 1)
+        self.web_controls = {"status": status, "table": table, "raw": raw}
+
+    def run_web_assessment(self):
+        target, authorized = self.web_target.text(), self.web_authorized.isChecked()
+        tls, disclosure, case_id = self.web_tls.isChecked(), self.web_security_txt.isChecked(), self.active_case()
+        cors, methods = self.web_cors.isChecked(), self.web_methods.isChecked()
+        def task():
+            self.session.check("collect")
+            result = assess_web(target, authorized, tls, disclosure, check_cors=cors, check_methods=methods)
+            if case_id:
+                self.session.save_finding(case_id, "web", result)
+            else:
+                self.session.audit("web_assessment", result.status + "; no case selected")
+            return result
+        self.start_job("Assessing web configuration", task, lambda result: self.show_result("web", result))
+
+    def build_wifi_page(self):
+        layout = self.page("Discover responding devices on your Wi-Fi or local network and view IP/MAC addresses. Requires Nmap.")
+        row = QHBoxLayout()
+        self.wifi_subnet = QComboBox()
+        self.wifi_subnet.setEditable(True)
+        self.wifi_subnet.lineEdit().setPlaceholderText("Local IPv4 subnet, e.g. 192.168.1.0/24")
+        row.addWidget(self.wifi_subnet, 1)
+        row.addWidget(self.button("Detect local networks", self.detect_wifi_networks))
+        layout.addLayout(row)
+        self.wifi_authorized = QCheckBox("I own this Wi-Fi/LAN or have permission to discover its devices")
+        layout.addWidget(self.wifi_authorized)
+        actions = QHBoxLayout()
+        actions.addWidget(self.button("Scan devices", self.run_wifi_scan, True))
+        actions.addWidget(self.button("Export devices CSV", self.export_wifi_csv))
+        actions.addWidget(self.button("Inspect selected device ports", self.inspect_wifi_device))
+        actions.addStretch()
+        layout.addLayout(actions)
+        note = QLabel(WIFI_NOTE)
+        note.setWordWrap(True)
+        note.setObjectName("muted")
+        layout.addWidget(note)
+        status = QLabel("Ready • Detect a local network or enter its subnet, then scan devices.")
+        status.setWordWrap(True)
+        layout.addWidget(status)
+        table, raw = DataTable("Filter IP, MAC, vendor or status…"), QTextEdit()
+        raw.setReadOnly(True)
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(table)
+        split.addWidget(raw)
+        split.setSizes([450, 150])
+        layout.addWidget(split, 1)
+        self.wifi_controls = {"status": status, "table": table, "raw": raw}
+
+    def inspect_wifi_device(self):
+        if self.busy:
+            self.notice.setText("Wait for the running task before inspecting a device.")
+            return
+        row = self.wifi_controls["table"].selected()
+        if not row:
+            return self.error("Select a discovered device first.")
+        self.nmap_targets.setText(row["ip"])
+        self.nmap_ports.clear()
+        self.nmap_authorized.setChecked(False)
+        self.nmap_vulnerabilities.setChecked(False)
+        self.navigation.setCurrentRow(12)
+        self.notice.setText("Selected device loaded. Confirm scan permission and click Scan IPs to inspect services.")
+
+    def add_module_exports(self):
+        indexes = {"osint": 1, "breach": 2, "threat": 3, "cdr": 4, "network": 5,
+                   "geo": 6, "phone": 7, "subdomains": 11, "nmap": 12, "wifi": 13, "web": 14, "profiles": 15}
+        for key, index in indexes.items():
+            actions = QHBoxLayout()
+            actions.addWidget(self.button("Export full JSON", lambda key=key: self.export_module(key, "json")))
+            actions.addWidget(self.button("Export filtered CSV", lambda key=key: self.export_module(key, "csv")))
+            actions.addStretch()
+            self.pages.widget(index).layout().addLayout(actions)
+
+    def export_module(self, key, kind):
+        if self.busy:
+            self.notice.setText("Wait for the running task before exporting results.")
+            return
+        result = self.last_results.get(key)
+        if not result:
+            return self.error("Collect, analyze or restore a result first.")
+        table = getattr(self, key + "_controls")["table"]
+        rows = [dict(table.model.rows[table.proxy.mapToSource(table.proxy.index(i, 0)).row()])
+                for i in range(table.proxy.rowCount())]
+        path, _ = QFileDialog.getSaveFileName(self, "Export module result", f"{key}-result.{kind}", f"{kind.upper()} (*.{kind})")
+        if not path:
+            return
+        if not path.lower().endswith("." + kind):
+            path += "." + kind
+        self.start_job("Exporting " + key + " results",
+            lambda: export_result(self.session, key, result, path, kind, rows),
+            lambda exported: self.notice.setText("Results written: " + exported))
+
+    def detect_wifi_networks(self):
+        def complete(networks):
+            if not networks:
+                self.notice.setText("No active private IPv4 network of /22 or smaller found. Enter a local subnet manually.")
+                return
+            self.wifi_subnet.clear()
+            for row in networks:
+                self.wifi_subnet.addItem(row["network"], row)
+                self.wifi_subnet.setItemData(self.wifi_subnet.count() - 1,
+                    row["interface"] + " • " + row["ip"] + " • " + row.get("scope_note", "Full detected subnet"), Qt.ToolTipRole)
+            batches = sum("scope_note" in row for row in networks)
+            self.notice.setText(f"Found {len(networks)} local networks. Choose the interface subnet you want to scan." +
+                (f" {batches} larger networks use a suggested /24 batch; other addresses are outside this scan." if batches else ""))
+        self.start_job("Detecting local network interfaces", local_networks, complete)
+
+    def run_wifi_scan(self):
+        subnet, authorized = self.wifi_subnet.currentText(), self.wifi_authorized.isChecked()
+        case_id = self.active_case()
+        def task():
+            self.session.check("collect")
+            result = scan_devices(subnet, authorized)
+            if case_id:
+                self.session.save_finding(case_id, "wifi", result)
+            else:
+                self.session.audit("wifi_device_discovery", result.query + "; no case selected")
+            return result
+        self.start_job("Discovering Wi-Fi/LAN devices", task, lambda result: self.show_result("wifi", result))
+
+    def export_wifi_csv(self):
+        result = self.last_results.get("wifi")
+        if not result:
+            return self.error("Scan devices first.")
+        path, _ = QFileDialog.getSaveFileName(self, "Export discovered devices", "network-devices.csv", "CSV (*.csv)")
+        if not path:
+            return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
+        def task():
+            self.session.check("report")
+            destination = validate_export_destination(self.session, path)
+            exported = export_devices(result, destination)
+            self.session.audit("wifi_devices_exported", result.query)
+            return exported
+        self.start_job("Exporting discovered devices", task,
+                       lambda exported: self.notice.setText("Devices CSV written: " + exported))
 
     def build_nmap_page(self):
         layout = self.page("Active TCP scanning with Nmap: ports, services, product versions and potential vulnerability matches. Requires Nmap on PATH.")
@@ -616,6 +859,15 @@ class MainWindow(QMainWindow):
         controls["table"].set_rows(self.result_rows(result))
         controls["raw"].setPlainText(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
         controls["status"].setText(f"{result.status.upper()} • {result.freshness} • {result.source} • {result.collected_at}" + (f" • {result.error}" if result.error else ""))
+        if key == "profiles" and result.data:
+            controls["status"].setText(controls["status"].text() + f" • {result.data['match_count']} supplied profile links • ownership not verified")
+        if key == "web" and result.data and "summary" in result.data:
+            summary = result.data["summary"]
+            controls["status"].setText(controls["status"].text() +
+                f" • {summary['findings']} findings • {summary['review_items']} review items • {summary['warning_count']} warnings")
+        if key == "wifi" and result.data:
+            controls["status"].setText(controls["status"].text() +
+                f" • {result.data['device_count']} discovered devices • MAC available: {result.data['mac_available_count']} • {result.query}")
         if key == "nmap" and result.data:
             rows = result.data["records"]
             opened = sum(row["state"] == "open" for row in rows)
@@ -837,17 +1089,17 @@ class MainWindow(QMainWindow):
             self.notice.setText("Wait for the running task before restoring a finding.")
             return
         row = self.findings_table.selected()
-        if not row or row["module"] not in {"cdr", "network", "geo", "osint", "breach", "threat", "phone", "subdomains", "nmap"}:
+        if not row or row["module"] not in {"cdr", "network", "geo", "osint", "breach", "threat", "phone", "subdomains", "nmap", "wifi", "web", "profiles"}:
             return self.error("Select a module finding first.")
         key = row["module"]
         result = Result(**json.loads(row["result"]))
-        if result.status == "live":
+        if result.status in {"live", "cached"}:
             from datetime import datetime, timezone
             result.status = "cached"
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(result.collected_at)).total_seconds()
-            result.freshness = "stale" if age >= self.config.cache_seconds else "fresh"
+            result.freshness = "stale" if not 0 <= age < self.config.cache_seconds or result.freshness == "stale" else "fresh"
         self.show_result(key, result)
-        self.navigation.setCurrentRow({"osint": 1, "breach": 2, "threat": 3, "cdr": 4, "network": 5, "geo": 6, "phone": 7, "subdomains": 11, "nmap": 12}[key])
+        self.navigation.setCurrentRow({"osint": 1, "breach": 2, "threat": 3, "cdr": 4, "network": 5, "geo": 6, "phone": 7, "subdomains": 11, "nmap": 12, "wifi": 13, "web": 14, "profiles": 15}[key])
 
     def export_report(self, kind):
         case_id = self.need_case()
@@ -893,7 +1145,21 @@ class MainWindow(QMainWindow):
         endpoints.setWordWrap(True)
         endpoints.setObjectName("muted")
         layout.addWidget(endpoints)
+        layout.addWidget(self.button("Check tool readiness", self.check_readiness))
+        self.readiness_table = DataTable("Filter tools, providers or status…")
+        self.readiness_table.setMinimumHeight(180)
+        layout.addWidget(self.readiness_table, 1)
         layout.addStretch()
+
+    def check_readiness(self):
+        keys = dict(self.collector.keys)
+        def task():
+            self.session.check("read")
+            return readiness(keys)
+        def complete(rows):
+            self.readiness_table.set_rows(rows)
+            self.notice.setText("Local readiness checked. Configured credentials do not prove provider access.")
+        self.start_job("Checking local tools and provider configuration", task, complete)
 
     def toggle_credential_visibility(self, field, eye, title, visible):
         field.setEchoMode(QLineEdit.Normal if visible else QLineEdit.Password)
@@ -1068,7 +1334,7 @@ class MainWindow(QMainWindow):
         if ordered:
             self.dashboard_plot.addItem(pg.BarGraphItem(x=list(range(len(ordered))), height=[c for _, c in ordered], width=.55, brush="#8e75de"))
         self.dashboard_plot.getAxis("bottom").setTicks([[(i, day[5:]) for i, (day, _) in enumerate(ordered)]])
-        for key in ("cdr", "network", "geo"):
+        for key in ("cdr", "network", "geo", "profiles"):
             selector = getattr(self, key + "_controls")["selector"]
             selected = selector.currentData()
             selected_id = selected["id"] if selected else None

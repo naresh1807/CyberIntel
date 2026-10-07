@@ -42,3 +42,40 @@ tabular/capture analysis, scanning, credentials, exports, and existing tests.
 Live external APIs, paid lookups, active target scans, installation, and packaged
 bundles were not exercised. This review does not establish that every possible
 defect has been eliminated.
+
+## CyberRecon continuation review
+
+Added a separate CyberRecon CLI/desktop workspace while retaining CyberIntel.
+The implementation and outstanding specification work are documented in
+[CYBERRECON.md](CYBERRECON.md).
+
+Additional defects fixed during implementation:
+
+- Block excluded public IPs returned by DNS, even when the hostname is included.
+- Use absolute DNS names, avoiding search-suffix expansion in native requests,
+  provider requests and the Go worker.
+- Reject URL scope rules rather than broadening a path to a whole domain.
+- Reject IPv6 addresses before passive domain engines are invoked.
+- Preserve verified URL observations when another page links to the same URL.
+- Keep HTTP relationships attached to the actual response host; unify explicit
+  IP nodes across HTTP and port observations.
+- Keep collection times, raw evidence paths and randomized negative controls
+  from generating false scan-comparison changes.
+- Bound compressed response output and reject redirects without destinations.
+- Block credential forwarding across hosts; omit CSP nonces and digest values.
+- Capture certificate metadata before connection closure and use the SSL API
+  supported by httpcore; verify custom lab CAs without disabling TLS checks.
+- Record scope changes with schema-1 migration to schema 2.
+- Reject invalid scan exports before creating directories, and finish interrupted
+  imports as failed rather than leaving permanent running records.
+- Isolate optional-engine failures and terminate external process groups on
+  cancellation; update desktop progress without blocking the UI.
+
+Verification at this stage: **311 Python tests passed**, Go race tests passed,
+and a real Nmap scan of a script-owned loopback HTTP/TLS service completed.
+The TLS check collected four HTTP observations, one open port, two API records
+and one JavaScript record, and generated JSON/CSV/HTML/PDF/graph reports.
+No real-world targets or paid providers were queried. Shodan/Censys and NVD
+contracts use mocked transports. Debian and signed development APT artifacts
+are available, but clean Kali/Parrot installation, upgrade and uninstall remain
+unverified; this is not a completed production release.

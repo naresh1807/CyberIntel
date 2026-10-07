@@ -24,6 +24,10 @@ from .output import atomic_output
 MAX_ROWS = 100_000
 
 
+def normalized_column(value):
+    return re.sub(r"[\s-]+", "_", str(value).strip().lower())
+
+
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as file:
@@ -38,13 +42,19 @@ def read_table(path):
         raise ValidationError("Use a regular CSV/XLSX file no larger than 50 MiB.")
     if path.suffix.lower() == ".csv":
         with path.open(encoding="utf-8-sig", newline="") as file:
-            header = next(csv.reader(file), [])
-        normalized = [name.strip().lower() for name in header]
+            sample = file.read(65536)
+            file.seek(0)
+            try:
+                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t").delimiter
+            except csv.Error:
+                delimiter = ","
+            header = next(csv.reader(file, delimiter=delimiter), [])
+        normalized = [normalized_column(name) for name in header]
         if not normalized or any(not name for name in normalized):
             raise ValidationError("Every table column needs a nonempty name.")
         if len(set(normalized)) != len(normalized):
             raise ValidationError("Duplicate column names after normalization.")
-        frame = pd.read_csv(path, dtype=str, keep_default_na=False, nrows=MAX_ROWS + 1)
+        frame = pd.read_csv(path, sep=delimiter, dtype=str, keep_default_na=False, nrows=MAX_ROWS + 1)
     elif path.suffix.lower() == ".xlsx":
         with zipfile.ZipFile(path) as archive:
             if sum(i.file_size for i in archive.infolist()) > 150 * 1024 * 1024:
@@ -55,7 +65,7 @@ def read_table(path):
         workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
         try:
             header = next(workbook.worksheets[0].iter_rows(min_row=1, max_row=1, values_only=True), ())
-            normalized = [str(name).strip().lower() for name in header]
+            normalized = [normalized_column(name) for name in header]
             if not normalized or any(name is None or not str(name).strip() for name in header):
                 raise ValidationError("Every table column needs a nonempty name.")
             if len(set(normalized)) != len(normalized):
@@ -69,9 +79,11 @@ def read_table(path):
         raise ValidationError(f"Table exceeds {MAX_ROWS:,} rows; split the dataset first.")
     if frame.empty:
         raise ValidationError("File contains no data rows.")
-    frame.columns = [str(c).strip().lower() for c in frame.columns]
+    frame.columns = [normalized_column(c) for c in frame.columns]
     if len(set(frame.columns)) != len(frame.columns):
         raise ValidationError("Duplicate column names after normalization.")
+    for column in frame.columns:
+        frame[column] = frame[column].str.strip()
     return frame
 
 
@@ -136,8 +148,9 @@ def analyze_cdr(path, data_kind="actual"):
 def relationship_graph(result, destination):
     graph = nx.DiGraph()
     edges = result.data.get("relationships", [])
+    total = len(edges)
     if len(edges) > 2000:
-        raise ValidationError("Graph rendering is limited to 2,000 relationships. Filter the source dataset first.")
+        edges = sorted(edges, key=lambda row: (-row["calls"], row["caller"], row["callee"]))[:2000]
     for row in edges:
         graph.add_edge(row["caller"], row["callee"], weight=row["calls"])
     # NetworkX's large spring layout requires SciPy, which is not a suite dependency.
@@ -155,7 +168,8 @@ def relationship_graph(result, destination):
                    marker=dict(size=14, color="#a78bfa"),
                    hovertext=[f"{n}: {graph.degree(n)} relationships" for n in nodes], hoverinfo="text")
     ])
-    figure.update_layout(template="plotly_dark", title="CDR relationships · " + result.data["provenance_kind"] + " · edges show associations; see table for direction",
+    coverage = f" · showing {len(edges):,} of {total:,} relationships (highest call counts)" if total > 2000 else ""
+    figure.update_layout(template="plotly_dark", title="CDR relationships · " + result.data["provenance_kind"] + coverage + " · edges show associations; see table for direction",
                          showlegend=False, xaxis=dict(visible=False), yaxis=dict(visible=False))
     with atomic_output(destination) as temporary:
         figure.write_html(str(temporary), include_plotlyjs=True, auto_open=False)
@@ -182,6 +196,7 @@ def analyze_geo(path, mode="gps", data_kind="actual"):
     frame["latitude"], frame["longitude"] = latitude, longitude
     if mode == "gps":
         frame["timestamp"] = timestamps(frame["timestamp"]).astype(str)
+        frame["record_kind"] = frame["record_kind"].str.lower()
         if not frame["record_kind"].isin(["actual", "inferred", "synthetic"]).all():
             raise ValidationError("record_kind must be actual, inferred or synthetic.")
         if data_kind == "synthetic":
@@ -200,11 +215,13 @@ def analyze_geo(path, mode="gps", data_kind="actual"):
 
 
 def location_map(result, destination, online_tiles=False):
-    records = result.data["records"]
+    all_records = result.data["records"]
+    records = all_records
     if not records:
         raise ValidationError("There are no location records to map.")
     if len(records) > 10000:
-        raise ValidationError("Map is limited to 10,000 records. Split the dataset first.")
+        indexes = np.linspace(0, len(records) - 1, 10000, dtype=int)
+        records = [records[int(index)] for index in indexes]
     center = [float(np.mean([r["latitude"] for r in records])), float(np.mean([r["longitude"] for r in records]))]
     map_ = folium.Map(location=center, zoom_start=10, tiles="OpenStreetMap" if online_tiles else None)
     colors = {"actual": "blue", "inferred": "orange", "synthetic": "purple", "tower_inventory": "green"}
@@ -217,6 +234,8 @@ def location_map(result, destination, online_tiles=False):
         map_.fit_bounds([[min(r["latitude"] for r in records), min(r["longitude"] for r in records)],
                          [max(r["latitude"] for r in records), max(r["longitude"] for r in records)]])
     title = '<div style="position:fixed;top:10px;left:50px;z-index:9999;background:white;padding:12px;font:14px sans-serif">CyberIntel • blue: actual • orange: inferred • purple: synthetic • green: tower inventory</div>'
+    if len(all_records) > len(records):
+        title = title.replace("</div>", f"<br>Sample: {len(records):,} of {len(all_records):,} records in input order. Full data remains in tables and JSON.</div>")
     map_.get_root().html.add_child(folium.Element(title))
     with atomic_output(destination) as temporary:
         map_.save(str(temporary))
