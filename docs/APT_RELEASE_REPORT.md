@@ -1,5 +1,8 @@
 # CyberRecon APT release report
 
+The candidate results below are historical; see the production identity update
+below for the current signing configuration status.
+
 CyberRecon Version: **0.2.0**
 
 Debian Revision: **5** (`cyberrecon 0.2.0-5`)
@@ -106,3 +109,24 @@ No clone, Python script, manual .deb download or build is required for end users
 once the real signed repository has been configured and qualified.
 
 Production status: **NOT APPROVED**.
+
+## Production identity update
+
+The owner subsequently supplied public fingerprint
+F1C454E3BB40C77AB236828DCB222DFEAD382DFC and
+Thatikonda Naresh Goud <nareshthatikonda143@gmail.com> (Ed25519).
+Historical development fingerprint/results above are not production trust.
+Imported production-key checks and protected Environment cleanup are IMPLEMENTED.
+Real production import/signing and Environment secrets/protections remain NOT TESTED.
+Production status remains NOT APPROVED. See APT_REPOSITORY.md for manual owner setup.
+
+Signing setup validation: complete suite **437 passed, 0 failed, 0 skipped**
+(37.56 seconds), artifacts/production-signing-setup/pytest.xml. Workflow YAML
+parsed, git diff --check passed, and the source security heuristic scan passed
+for 150 files; tracked private-key header search found no matches. These are
+bounded source checks, not proof of real production-secret configuration.
+Production qualification with the supplied public maintainer identity failed
+closed because the HTTPS APT hosting URL is missing.
+Dedicated signing/APT/release regression run: **51 passed** (2.63 seconds),
+including real development-only InRelease and Release.gpg verification.
+Production-key signature verification remains **NOT TESTED**.

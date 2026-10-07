@@ -15,6 +15,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_release_security import check_artifact, safe_name
+from sign_cyberrecon_release import normalize_fingerprint, PRODUCTION_FINGERPRINT
 
 LIMIT = 8 * 1024 * 1024
 
@@ -55,8 +56,9 @@ def signature(keyring, fingerprint, signature_path, output, data=None):
 
 
 def verify(directory, keyring, fingerprint, expected_version='0.2.0-5', production=False):
-    if not re.fullmatch('[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64}', fingerprint):
-        raise ValueError('An independently verified full fingerprint is required')
+    fingerprint = normalize_fingerprint(fingerprint)
+    if production and fingerprint != PRODUCTION_FINGERPRINT:
+        raise ValueError('Expected approved production fingerprint')
     root = Path(directory).absolute()
     if root.is_symlink():
         raise ValueError('Repository root cannot be a symlink')

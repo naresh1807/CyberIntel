@@ -119,7 +119,8 @@ def test_release_workflow_keeps_signing_secrets_outside_artifact_paths():
     workflow = (ROOT / '.github/workflows/release-apt.yml').read_text()
     assert 'workflow_dispatch:' in workflow and 'pull_request' not in workflow
     sign = workflow.split('\n  sign:', 1)[1].split('\n  deploy:', 1)[0]
-    assert 'environment: cyberrecon-production' in sign
+    assert 'name: cyberrecon-production' in sign
+    assert 'if: always()' in sign and 'umask 077' in sign
     for secret in ('APT_SIGNING_PRIVATE_KEY', 'APT_SIGNING_PASSPHRASE'):
         reference = '${{ secrets.' + secret + ' }}'
         assert workflow.count(reference) == 1 and reference in sign

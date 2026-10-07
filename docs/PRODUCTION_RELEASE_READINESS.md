@@ -1,6 +1,6 @@
 # CyberRecon v0.2.0 production release readiness
 
-APT phase baseline: `c1cdeb4`. Previous final-gate baseline: `c1fafb8`. This phase includes uncommitted final-gate
+Signing setup baseline: `fddfafc`. APT phase baseline: `c1cdeb4`. Previous final-gate baseline: `c1fafb8`. This phase includes uncommitted signing setup
 changes and does not qualify an immutable production commit. Runtime and Go
 protocol: **0.2.0**. Candidate Debian package: **cyberrecon 0.2.0-5**.
 Compatibility Python distribution/desktop: **cyberintel-suite / CyberIntel 0.1.0**,
@@ -11,7 +11,7 @@ No debian/ tree exists; scripts/build-cyberrecon-deb.py generates Debian metadat
 
 | Gate | Status | Evidence |
 | --- | --- | --- |
-| Full test suite | PASS | .venv/bin/python -m pytest -q --junitxml artifacts/apt-production-phase/pytest.xml: 421 passed, 0 failed, 0 skipped, 0 xfailed (35.52 seconds); earlier final-gate baseline 410 passed. |
+| Full test suite | PASS | .venv/bin/python -m pytest -q --junitxml artifacts/production-signing-setup/pytest.xml: 437 passed, 0 failed, 0 skipped, 0 xfailed (37.56 seconds); prior APT baseline 421 passed. |
 | Kali desktop | BLOCKED | Live Kali 2026.3 source GUI passed as UID1000 on XFCE/X11 Qt xcb; installed clean desktop VM is unavailable. No qemu-system-x86_64/virsh/VBoxManage or /dev/kvm; sudo -n true requires a password. Evidence: artifacts/final-production-gate/desktop/desktop.json. |
 | Parrot desktop | BLOCKED | No suitable Parrot Security amd64 desktop VM/environment available. Historical core-image package tests do not satisfy this gate. |
 | Fresh install | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
@@ -24,9 +24,9 @@ No debian/ tree exists; scripts/build-cyberrecon-deb.py generates Debian metadat
 | Non-root CLI | PASS | .venv/bin/cyberrecon --version (0.2.0), --help and --doctor executed as UID1000; source CLI only. Installed non-root CLI remains part of VM gates. |
 | Scope enforcement | PASS | Full suite covers include/exclude, wildcard/apex, IPv4/IPv6 CIDR, private IP authorization, DNS exclusions and scope-before-transport. |
 | APT repository | BLOCKED | Production HTTPS repository and default-APT public installation unavailable. Development repository signatures/checksums are historical local evidence only. |
-| Repository signing | BLOCKED | No operator-managed production key, independently verified fingerprint or protected signing credentials available. No private key generated/committed for production. |
+| Repository signing | BLOCKED | Owner supplied expected production fingerprint F1C454E3BB40C77AB236828DCB222DFEAD382DFC. Actual imported production key, protected secrets and signing are NOT TESTED. No private key generated/committed for production. |
 | License | PASS | LICENSE is MIT; pyproject SPDX expression, Debian copyright, README and GUI About agree; compatibility distribution remains0.1.0 by design. |
-| Maintainer metadata | BLOCKED | RELEASE BLOCKER: Maintainer identity required before production publication. User previously confirmed public name/email unavailable; no fabricated identity. |
+| Maintainer metadata | BLOCKED | RELEASE BLOCKER: Maintainer identity required before production publication. Owner now supplied Thatikonda Naresh Goud <nareshthatikonda143@gmail.com>; Environment application/verification pending. |
 | Release workflow | NOT TESTED | Workflow YAML/action pins inspected and local release gates tested. GitHub workflow execution/protected-environment configuration not verified; production v0.2.0 tag is not created. |
 
 ## Supported policy and measured environment
@@ -62,8 +62,8 @@ reinstall. Mutation-detection regression passes; the real revised harness remain
 NOT TESTED because a privileged disposable OS is unavailable. It refuses changes
 on unmarked hosts. No current system package installation/removal was attempted.
 
-MIT is preserved. Maintainer identity, hosting and operator signing key remain
-unavailable, as already stated by the user. No fake name/email, private production
+MIT is preserved. The owner has now supplied the public production identity and
+fingerprint. Hosting and installed Environment secrets/protections remain unverified. No fake name/email, private production
 key or public hosting endpoint was created. [Signing/rotation/recovery](APT_REPOSITORY.md)
 and [compatibility migration](COMPATIBILITY_MIGRATION.md) remain documented.
 
@@ -96,7 +96,7 @@ results are recorded in release-evidence/final-production-build.json.
 Kali and Parrot Security amd64 desktop VMs with default APT behavior, normal-user
 CLI/Doctor/GUI/menu, old→new data/report preservation, reboot, remove, purge and
 reinstall. Preserve OS/session, package hashes and logs. Do not reboot this host.
-2. Supply a real public maintainer name/email, provision HTTPS APT hosting and an
+2. Configure the owner-supplied public maintainer name/email, provision HTTPS APT hosting and an
 operator-managed signing key through protected secrets; independently distribute
 its public fingerprint and execute the trust/rotation/recovery checks.
 3. Run the candidate GitHub workflow, review every mandatory gate and exact-commit
@@ -114,6 +114,20 @@ metadata verification and protected manual publication. Local Debian APT tests
 verify development signatures/candidate indexes and reject unsigned metadata;
 they do not install the package or certify production HTTPS.
 See [APT release report](APT_RELEASE_REPORT.md).
+
+
+## Production signing setup (owner identity supplied)
+
+IMPLEMENTED: imported-key fingerprint/UID/Ed25519/validity/capability checks,
+normalized fingerprints, umask077, temporary secret handling, if-always cleanup
+and explicit production environments. APT_SIGNING_FINGERPRINT is public
+configuration; APT_SIGNING_PRIVATE_KEY and APT_SIGNING_PASSPHRASE are secrets
+the owner must add manually under cyberrecon-production.
+Expected pin: F1C454E3BB40C77AB236828DCB222DFEAD382DFC.
+Actual real-key signing, Environment settings/protections and secret availability:
+NOT TESTED. Hosting and clean supported-system lifecycle remain BLOCKED.
+No production key was generated, replaced, exported or committed by this agent.
+See the exact owner setup in [APT operations](APT_REPOSITORY.md).
 
 CYBERRECON v0.2.0 PRODUCTION RELEASE DECISION
 

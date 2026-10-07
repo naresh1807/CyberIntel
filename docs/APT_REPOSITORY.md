@@ -1,10 +1,10 @@
 # APT repository and signing operations
 
-**Production status: BLOCKED.** No public HTTPS URL or maintainer identity is
-available. `sudo apt install cyberrecon` from the default Kali/Parrot repositories
+**Production status: BLOCKED.** No public HTTPS URL is available. The maintainer has supplied the
+production identity below; GitHub Environment configuration remains manual. `sudo apt install cyberrecon` from the default Kali/Parrot repositories
 is not supported today. GitHub Pages is a prepared hosting option, not a live
 repository. Only local development signing has been executed.
-**PUBLIC APT HOSTING REQUIRED. PRODUCTION SIGNING KEY REQUIRED.**
+**PUBLIC APT HOSTING REQUIRED. PRODUCTION SIGNING SECRETS MUST BE CONFIGURED BY THE OWNER.**
 
 ## Layout and trust
 
@@ -144,7 +144,8 @@ GitHub Pages deployment uses the conventional repository root, so APT_PUBLIC_URL
 must point to that deployed root, not an invented /apt directory. Obtain the
 actual Pages URL from repository Settings/Pages or deployment output. Configure
 HTTPS, protected production/Pages environments and independent key distribution
-before publishing. No domain or production fingerprint is available today.
+before publishing. The owner supplied the expected public production fingerprint;
+the actual HTTPS URL and independently distributed public key remain unverified.
 
 Release metadata expires after seven days. Before expiry, re-run the manually
 protected workflow with publish=true and refresh_only=true for the same qualified
@@ -200,7 +201,72 @@ python3 scripts/sign_cyberrecon_release.py dist/candidate/cyberrecon_0.2.0-5_amd
 python3 scripts/verify_cyberrecon_apt.py dist/bootstrap-apt --keyring dist/bootstrap-apt/cyberrecon-archive-keyring.gpg --fingerprint "$APT_SIGNING_FINGERPRINT" --production
 ```
 
-Provisioning that host/key is BLOCKED in this session. The prepared workflow is
+Provisioning that host and configuring the existing owner-controlled key in GitHub
+are BLOCKED in this session. The prepared workflow is
 not an automatically executable bootstrap bypass. Installation will always need
 one-time source/key setup unless the package is independently accepted into an
 OS's official repositories; no such inclusion is claimed.
+
+
+## Owner-supplied production identity and environment setup
+
+Public expected fingerprint: `F1C454E3BB40C77AB236828DCB222DFEAD382DFC`.
+Owner-supplied identity: `Thatikonda Naresh Goud <nareshthatikonda143@gmail.com>`.
+Owner-supplied algorithm: Ed25519. These are public configuration, not secret
+material. The actual production key was not imported or inspected in this session.
+Do not replace it or use any historical development fingerprint as a production
+trust anchor. Existing test fixtures remain separate development-only tests.
+
+The owner must create/configure Settings → Environments → **cyberrecon-production**:
+
+| Setting | Type | Value/action |
+| --- | --- | --- |
+| APT_SIGNING_FINGERPRINT | Environment variable; public | F1C454E3BB40C77AB236828DCB222DFEAD382DFC |
+| CYBERRECON_MAINTAINER | Public variable | Thatikonda Naresh Goud <nareshthatikonda143@gmail.com> |
+| APT_PUBLIC_URL | Public variable | Actual qualified HTTPS repository URL; not available here |
+| RELEASE_QUALIFIED_COMMIT | Public variable | Exact independently qualified commit |
+| RELEASE_QUALIFICATION_JSON | Reviewed evidence variable | Approved, clean, matching commit/version and every mandatory gate PASS |
+| APT_SIGNING_PRIVATE_KEY | Environment secret | Owner adds encrypted private signing material privately in GitHub Settings |
+| APT_SIGNING_PASSPHRASE | Environment secret | Owner adds its passphrase privately in GitHub Settings |
+
+Never put the two secret values in source, .env, logs, artifacts, issues, commits
+or this chat. No secret values are supplied or requested here. Require reviewers,
+prevent self/bypass approval where supported and restrict deployment to main,
+the existing workflow's intended ref. Audit all workflows allowed to use this
+environment; GitHub Environment secrets are not inherently tied to a single
+workflow file. Protect main and require review of release workflow changes.
+Keep unrelated workflows outside the production environment. Separately protect
+github-pages and configure candidate preparation without production secrets.
+
+Sign and publish jobs explicitly reference environment.name cyberrecon-production.
+Only the signing step receives the two secrets. It sets umask077, imports through
+stdin into an isolated0700 GNUPGHOME, keeps its passphrase file0600, removes
+secrets from child environments and suppresses import output. It independently
+lists imported secret-key metadata and checks normalized fingerprint, approved
+primary, exact public identity, Ed25519, validity and usable signing capability
+before signing. Extra primary keys and a wrong/missing configured fingerprint fail.
+Whitespace/case normalization is used for both key checks and signature pins.
+
+Python finally cleanup restores environment/umask and removes temporary material.
+A separate workflow **if: always()** step kills only temporary signing agents and
+removes only matching temporary directories outside the workspace before uploads.
+No set-x tracing is used. The local APT verifier checks both signatures against
+the approved production primary/signing identity; all previous publication,
+exact-commit, clean-tree, HTTPS and qualification gates remain in place.
+
+On the owner's machine, validate public metadata without exposing private contents:
+
+```bash
+PRODUCTION_FP=F1C454E3BB40C77AB236828DCB222DFEAD382DFC
+gpg --fingerprint "$PRODUCTION_FP"
+gpg --batch --with-colons --with-fingerprint --with-subkey-fingerprint --list-keys "$PRODUCTION_FP"
+```
+
+Confirm the full primary fingerprint, supplied UID, Ed25519 and signing capability;
+check expiry/revocation. These commands show public metadata only. If the key is
+absent or differs, stop; do not generate a replacement or switch to a development
+key. Populate only public variables and protected secrets through the owner UI.
+After protected signing, use verify_cyberrecon_apt.py --production with this pin.
+Actual production signing/secret installation/Environment protection, hosted HTTPS
+and clean Kali/Parrot lifecycle remain NOT TESTED or BLOCKED. Local mock tests
+cannot prove that the owner's real key/secrets are configured or usable.
