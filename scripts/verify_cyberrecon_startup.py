@@ -17,6 +17,9 @@ def main():
     from PySide6.QtWidgets import QApplication
     from cyberrecon.gui import Window
     from cyberrecon.storage import Repository
+    if args.package:
+        import cyberrecon
+        assert Path(cyberrecon.__file__).resolve().is_relative_to(Path('/usr/share/cyberrecon'))
     with tempfile.TemporaryDirectory(prefix='cyberrecon-startup-') as temporary:
         app = QApplication.instance() or QApplication([])
         repo = Repository(temporary)
@@ -30,7 +33,16 @@ def main():
         window.close()
         QThreadPool.globalInstance().waitForDone(45000)
         app.processEvents()
-        print('GUI startup and event-loop shutdown: PASS (offscreen)')
+        # Also exercise the CLI's no-subcommand branch, which creates an empty
+        # workspace and launches the real application window.
+        from cyberrecon.cli import main as cli_main
+        QTimer.singleShot(200, app.quit)
+        assert cli_main(['--home', str(Path(temporary) / 'cli-workspace')]) == 0
+        for widget in app.topLevelWidgets():
+            widget.close()
+        QThreadPool.globalInstance().waitForDone(45000)
+        app.processEvents()
+        print('GUI window and CLI startup/event-loop shutdown: PASS (offscreen)')
     return 0
 
 

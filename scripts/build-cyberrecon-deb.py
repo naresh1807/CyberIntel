@@ -18,13 +18,18 @@ def build(output, worker=None):
     architecture = subprocess.check_output(["dpkg", "--print-architecture"], text=True, timeout=10).strip() if worker else "all"
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    destination = output / f"cyberrecon_{version}-3_{architecture}.deb"
+    destination = output / f"cyberrecon_{version}-4_{architecture}.deb"
     if destination.is_symlink():
         raise ValueError("Package destination cannot be a symlink.")
     with tempfile.TemporaryDirectory(prefix="cyberrecon-deb-") as temporary:
         stage = Path(temporary)
         control = stage / "DEBIAN"
         control.mkdir()
+        # Package-owned Python imports can create caches when launched as root.
+        # Debian's helper cleans only bytecode for this package's listed files.
+        prerm = control / "prerm"
+        prerm.write_text('#!/bin/sh\nset -e\ncase "${1:-}" in\n  remove|upgrade|deconfigure) py3clean -p cyberrecon ;;\nesac\nexit 0\n')
+        prerm.chmod(0o755)
         application = stage / "usr/share/cyberrecon"
         application.mkdir(parents=True)
         shutil.copytree(ROOT / "cyberrecon", application / "cyberrecon", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -47,11 +52,13 @@ def build(output, worker=None):
         documentation = stage / "usr/share/doc/cyberrecon"
         documentation.mkdir(parents=True)
         shutil.copy2(ROOT / "CYBERRECON.md", documentation / "README.md")
-        shutil.copytree(ROOT / "docs", documentation / "docs")
+        # Evidence hashes describe the finished archive and cannot be embedded
+        # recursively inside that same archive.
+        shutil.copytree(ROOT / "docs", documentation / "docs", ignore=shutil.ignore_patterns("release-evidence", "__pycache__", "*.pyc"))
         (documentation / "workers").mkdir()
         shutil.copy2(ROOT / "workers/README.md", documentation / "workers/README.md")
         (documentation / "copyright").write_text("CyberRecon development package.\nProject licensing must be finalized before public redistribution.\n")
-        (control / "control").write_text(f"Package: cyberrecon\nVersion: {version}-3\nSection: net\nPriority: optional\nArchitecture: {architecture}\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython, python3-pyside6.qtwidgets, python3-networkx, python3-plotly, python3-reportlab\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n")
+        (control / "control").write_text(f"Package: cyberrecon\nVersion: {version}-4\nSection: net\nPriority: optional\nArchitecture: {architecture}\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython (>= 2.7), python3-pyside6.qtwidgets (>= 6.8), python3-networkx (>= 3.2.1), python3-numpy (>= 1:2.0), python3-plotly (>= 5.20), python3-reportlab (>= 4.3)\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n")
         subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(stage), str(destination)], check=True, timeout=120)
     return destination
 

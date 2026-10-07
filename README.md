@@ -1,6 +1,6 @@
 # CyberRecon
 
-The new **CyberRecon** entry point implements an bounded reconnaissance workflow with incremental security hardening. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon.cli --help` or launch the desktop with `.venv/bin/python -m cyberrecon.cli`.
+The **CyberRecon 0.2.0** entry point implements a bounded reconnaissance workflow with incremental security hardening. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon --help` or launch the desktop with `.venv/bin/python -m cyberrecon`.
 
 The verified audit, fixes, test results and release limits are in [docs/AUDIT.md](docs/AUDIT.md). CyberRecon requires an explicit project authorization reference and enforces include/exclude scope before active requests. Run `.venv/bin/cyberrecon --doctor` for bounded local tool/version/dependency checks.
 
@@ -10,7 +10,7 @@ For step-by-step instructions, see the [User Manual](USER_MANUAL.md).
 
 A modular Python desktop application for public intelligence collection and authorized offline forensic analysis. The PySide6 interface uses a dark purple, blue and charcoal palette with case selection, sortable/filterable tables, background jobs and PyQtGraph charts. No fixture data is loaded into a user's workspace automatically.
 
-This is version **0.1.0**, a tested development release, not a claim of production certification. All pages invoke implemented services. Credential-dependent providers and external tools report errors when unavailable; they never substitute synthetic results.
+The compatibility CyberIntel desktop and Python distribution metadata retain version **0.1.0**; CyberRecon reports **0.2.0**. These are development releases. [Release qualification](docs/RELEASE_QUALIFICATION.md) distinguishes measured package checks from remaining desktop/production gates. Credential-dependent providers and external tools report errors when unavailable; they never substitute synthetic results.
 
 ## Optional Windows development
 
@@ -24,7 +24,9 @@ The app opens directly into the local workspace, with no login or registration. 
 
 ## Kali Linux / Parrot Security OS installation
 
-Use Python 3.12 or newer. Kali Linux and Parrot Security OS are the primary release targets; clean distribution qualification remains pending. Run as a regular desktop user, not root.
+Use Python 3.12 or newer. Kali Linux and Parrot Security OS are the primary release targets. Keep the distro Python; 3.13 or 3.14 is recommended when supplied by the distribution. See [tested environments and installation paths](docs/RELEASE_QUALIFICATION.md). Run as a regular desktop user.
+
+For CyberRecon's Debian package, build `python3 scripts/build-cyberrecon-deb.py`, then install with `sudo apt install --no-install-recommends ./dist/cyberrecon_0.2.0-4_all.deb` and run `cyberrecon`. Public `apt install cyberrecon` without a local package path is not available yet. The following source installer remains the CyberIntel compatibility development path:
 
 ```bash
 bash scripts/install-linux.sh

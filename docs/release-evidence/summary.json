@@ -1,0 +1,28 @@
+{
+  "baseline": "c90c680",
+  "package": "dist/release-qualification/final/cyberrecon_0.2.0-4_all.deb",
+  "sha256": "637550bb581bcea1ab7670bae45373cb34e3e777ce36a1858660ce2baffd7dd2",
+  "python_source_tests": {
+    "passed": 391,
+    "failed": 0,
+    "skipped": 0
+  },
+  "distribution_subset": {
+    "kali": {
+      "passed": 127,
+      "skipped": 1
+    },
+    "parrot": {
+      "passed": 127,
+      "skipped": 1
+    }
+  },
+  "non_root_namespace_uid_1000": "PASS on both; default home/permissions/CLI/Doctor/offscreen GUI",
+  "fresh_minimal_install": "PASS on both",
+  "default_recommendations": {
+    "kali": "BLOCKED: systemd postinst requires unmapped UIDs",
+    "parrot": "STOPPED; not qualified"
+  },
+  "desktop_vm": "NOT_TESTED",
+  "public_apt": "NOT_AVAILABLE"
+}

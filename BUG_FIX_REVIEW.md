@@ -120,3 +120,19 @@ Added `python -m cyberrecon`; Debian revision is now 0.2.0-3. Validation: 386 Py
 tests passed, no failures/skips, offscreen GUI, CLI/Doctor, loopback TLS/Nmap,
 reports and package staging passed. Fresh Kali/Parrot apt and desktop lifecycle
 remain untested; environment overlay mounts failed and no host apt changes occurred.
+
+## Kali / Parrot release qualification
+
+See [docs/RELEASE_QUALIFICATION.md](docs/RELEASE_QUALIFICATION.md). Official Kali
+2026.3 and Parrot Security 7.4 image filesystems were tested in disposable
+rootless namespaces; the host package system was unchanged. Debian 0.2.0-4
+fixes missing NumPy, tested distro NetworkX/Plotly minima and package bytecode
+cleanup. Python remains >=3.12; CyberIntel stays intact.
+
+391 source tests passed. Each distro passed 127 CyberRecon tests with one
+intentional disposable-host guard skip. Real install/upgrade/fresh reinstall,
+CLI/Doctor, installed offscreen GUI, own TLS/Nmap scan, five report formats,
+remove/purge and project/scan/observation/user-marker preservation passed.
+Default workspace permissions and non-root namespace UID 1000 startup passed.
+Desktop VMs, full Security desktop editions, multi-user package ownership,
+public APT hosting and final license/maintainer identity remain release gates.

@@ -12,12 +12,6 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cyberrecon.reporting import export_reports
-from cyberrecon.scanner import scan
-from cyberrecon.storage import Repository
-
-
 class Handler(BaseHTTPRequestHandler):
     def handle(self):
         try:
@@ -57,7 +51,18 @@ def main():
     parser.add_argument("--home", default="artifacts/cyberrecon-lab")
     parser.add_argument("--no-nmap", action="store_true")
     parser.add_argument("--tls", action="store_true", help="Verify pinned HTTPS with an ephemeral script-owned lab certificate")
+    parser.add_argument("--package", action="store_true", help="Exercise installed /usr/share/cyberrecon payload instead of source")
+    parser.add_argument("--require-nmap", action="store_true", help="Fail instead of silently falling back when Nmap is absent")
     args = parser.parse_args()
+    sys.path.insert(0, '/usr/share/cyberrecon' if args.package else str(Path(__file__).resolve().parent.parent))
+    from cyberrecon.reporting import export_reports
+    from cyberrecon.scanner import scan
+    from cyberrecon.storage import Repository
+    if args.package:
+        import cyberrecon
+        assert Path(cyberrecon.__file__).resolve().is_relative_to(Path('/usr/share/cyberrecon'))
+    if args.require_nmap and (args.no_nmap or not shutil.which('nmap')):
+        parser.error('Release qualification requires real Nmap.')
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     temporary = tempfile.TemporaryDirectory(prefix="cyberrecon-lab-cert-")
     ca_bundle = None

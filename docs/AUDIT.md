@@ -239,3 +239,17 @@ partial DNS snapshot and large GUI refresh limitations remain. Clean distro apt
 lifecycle/desktop qualification is still unvalidated; an isolated overlay mount
 attempt failed, and no host package configuration was changed. Earlier test
 counts and package revisions above are historical results of the preceding audit.
+
+## Release qualification follow-up
+
+See [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md) for source-verified
+version/dependency policy, exact official image digests and real package
+lifecycle results. Qualification found and fixed missing Debian NumPy,
+overstrict distro NetworkX/Plotly minima, and leftover package bytecode on
+removal. Debian is now 0.2.0-4; Python remains >=3.12. CyberIntel is retained.
+The full source suite passed 391 tests; distro CyberRecon subsets each passed
+127 with one intentional disposable-host guard skip. Installed CLI/Doctor,
+offscreen GUI, own-loopback TLS/Nmap/reports, upgrade/data preservation and
+separate remove/purge/reinstall passed in disposable Kali and Parrot roots.
+Namespace UID 1000 default-home/GUI checks passed. Actual desktop VMs, real
+multi-user/root-owned host lifecycle, licensing and public APT remain gates.

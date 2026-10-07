@@ -1,0 +1,168 @@
+{
+  "status": "PASS",
+  "os_release": "PRETTY_NAME=\"Parrot Security 7.4 (echo)\"\nNAME=\"Parrot Security\"\nVERSION_ID=\"7.4\"\nVERSION=\"7.4 (echo)\"\nVERSION_CODENAME=echo\nDEBIAN_VERSION_FULL=13.6\nID=parrot\nID_LIKE=debian\nHOME_URL=\"https://www.parrotsec.org/\"\nSUPPORT_URL=\"https://www.parrotsec.org/docs\"\nBUG_REPORT_URL=\"https://gitlab.com/parrotsec/\"\n",
+  "kernel": "Linux-7.1.5+kali-amd64-x86_64-with-glibc2.41",
+  "python": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+  "uid": 0,
+  "gui_mode": "offscreen; real desktop NOT_TESTED",
+  "checks": {
+    "previous-metadata": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "current-metadata": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "previous-version": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "current-version": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "version-order": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "install-dpkg": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "install-dependencies": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "installed-previous": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "create-fixture": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "create-history-fixture": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "upgrade": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "installed-current": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "cli-version": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "cli-help": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "doctor": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "package-owner": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "gui-startup": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "installed-tls-nmap-reports": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "dpkg-audit": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "remove": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "reinstall-before-purge": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "purge": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "workspace-preservation": {
+      "status": "PASS"
+    },
+    "fresh-install-dpkg": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "fresh-install-dependencies": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "fresh-installed-version": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "fresh-create-workspace": {
+      "returncode": 0,
+      "status": "PASS"
+    },
+    "fresh-remove-purge": {
+      "returncode": 0,
+      "status": "PASS"
+    }
+  },
+  "previous": {
+    "sha256": "fa746e86bf640babdaaddfd2c60aa357c15493cdbd47c040a940f41c4c67c102",
+    "metadata": "Package: cyberrecon\nVersion: 0.2.0-3\nSection: net\nPriority: optional\nArchitecture: all\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython, python3-pyside6.qtwidgets, python3-networkx, python3-plotly, python3-reportlab\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n"
+  },
+  "current": {
+    "sha256": "6897d8a85477bbefe6f06643c282d62038920d149847c1e8d6900c74f506c588",
+    "metadata": "Package: cyberrecon\nVersion: 0.2.0-4\nSection: net\nPriority: optional\nArchitecture: all\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython (>= 2.7), python3-pyside6.qtwidgets (>= 6.8), python3-networkx (>= 3.2.1), python3-numpy (>= 1:2.0), python3-plotly (>= 5.20), python3-reportlab (>= 4.3)\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n"
+  },
+  "lab": {
+    "scan": "bc545d29-2cbb-43a7-a8a3-c878660e160d",
+    "status": "complete",
+    "real_nmap": true,
+    "tls_verified": true,
+    "counts": {
+      "http": 4,
+      "ports": 1,
+      "apis": 2,
+      "javascript": 1
+    },
+    "reports": "/tmp/cyberrecon-qualification-pass/lab/reports/bc545d29-2cbb-43a7-a8a3-c878660e160d"
+  },
+  "image": {
+    "repository": "parrotsec/core",
+    "digest": "sha256:7ac3f98c41fd0adf68a3c8ee2b3b69cc4c26335e8df3125b0c33a3928c08a7e2",
+    "manifest": {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "config": {
+        "mediaType": "application/vnd.oci.image.config.v1+json",
+        "digest": "sha256:16fa626c89bf9fab2cfc529d9b69ec0f9f28097f1ab222e05dcf5a24c849c0ba",
+        "size": 1112
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:40f3794519c3e62b6e7feed8e980ae487c418b34dfe9c456d35e62de1e509744",
+          "size": 185879782
+        },
+        {
+          "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+          "digest": "sha256:a0de31f33fda4722df110939823eb03bc31a0106cb0161254134c34cf2317253",
+          "size": 4587
+        }
+      ]
+    }
+  },
+  "test_context": "prepared"
+}

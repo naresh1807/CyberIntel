@@ -26,7 +26,10 @@ def main():
         subprocess.run(['dpkg-deb', '-e', str(package), str(control)], check=True, timeout=30)
         metadata = subprocess.check_output(['dpkg-deb', '-f', str(package)], text=True, timeout=10)
         assert 'Depends: python3 (>= 3.12)' in metadata
-        assert not any((control / name).exists() for name in ('preinst','postinst','prerm','postrm'))
+        assert not any((control / name).exists() for name in ('preinst','postinst','postrm'))
+        prerm = control / 'prerm'
+        assert prerm.stat().st_mode & 0o111
+        assert prerm.read_text() == '#!/bin/sh\nset -e\ncase "${1:-}" in\n  remove|upgrade|deconfigure) py3clean -p cyberrecon ;;\nesac\nexit 0\n'
         application = stage / 'usr/share/cyberrecon'
         launcher = stage / 'usr/bin/cyberrecon'
         worker = stage / 'usr/bin/cyberrecon-dns'
@@ -54,7 +57,7 @@ def main():
         assert marker.exists() and (home / 'cyberrecon.db').exists()
         print(json.dumps({'package_staging': 'PASS', 'entry_points': 'PASS', 'database_creation': 'PASS',
                           'overlay_preserves_state': 'PASS', 'staged_removal_preserves_state': 'PASS',
-                          'clean_kali_parrot_apt_lifecycle': 'NOT_TESTED'}, indent=2))
+                          'clean_kali_parrot_apt_lifecycle': 'NOT_TESTED_BY_THIS_CHECK'}, indent=2))
     return 0
 
 

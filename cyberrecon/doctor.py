@@ -30,9 +30,9 @@ PROBES = {
     "cyberrecon-dns": (["--version"], (0, 2), 1),
 }
 DEPENDENCIES = {"httpx": "httpx", "dnspython": "dns", "PySide6": "PySide6.QtWidgets",
-                "networkx": "networkx", "plotly": "plotly", "reportlab": "reportlab"}
+                "networkx": "networkx", "numpy": "numpy", "plotly": "plotly", "reportlab": "reportlab"}
 DEPENDENCY_RANGES = {"httpx": ((0, 28), 1), "dnspython": ((2, 7), 3), "PySide6": ((6, 8), 7),
-                     "networkx": ((3, 4), 4), "plotly": ((6, 0), 8), "reportlab": ((4, 3), 6)}
+                     "networkx": ((3, 2, 1), 4), "numpy": ((2, 0), 3), "plotly": ((5, 20), 8), "reportlab": ((4, 3), 6)}
 
 
 def tool_status(name, capability):
@@ -93,9 +93,9 @@ def doctor(home=None, wordlist=None):
             status = "MISSING"
             if installed:
                 importlib.import_module(module)
-                match = re.match(r"(\d+)\.(\d+)", version)
+                match = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", version)
                 minimum, upper = DEPENDENCY_RANGES[package]
-                numbers = tuple(map(int, match.groups())) if match else None
+                numbers = tuple(int(part or 0) for part in match.groups()) if match else None
                 status = "READY" if numbers and numbers >= minimum and numbers[0] < upper else "UNSUPPORTED"
             dependencies[package] = {"installed": installed, "version": version, "status": status}
         except (ImportError, ValueError, OSError, importlib.metadata.PackageNotFoundError):

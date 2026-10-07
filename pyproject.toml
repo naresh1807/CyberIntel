@@ -9,8 +9,8 @@ description = "Scope-controlled CyberRecon reconnaissance with CyberIntel compat
 requires-python = ">=3.12"
 dependencies = [
   "PySide6>=6.8,<7", "httpx>=0.28,<1", "cryptography>=44",
-  "pandas>=2.2,<4", "numpy>=2,<3", "networkx>=3.4,<4", "pyqtgraph>=0.13,<1",
-  "plotly>=6,<8", "folium>=0.19,<1", "dnspython>=2.7,<3",
+  "pandas>=2.2,<4", "numpy>=2,<3", "networkx>=3.2.1,<4", "pyqtgraph>=0.13,<1",
+  "plotly>=5.20,<8", "folium>=0.19,<1", "dnspython>=2.7,<3",
   "openpyxl>=3.1,<4", "reportlab>=4.3,<6", "phonenumbers>=9,<10"
 ]
 

@@ -43,10 +43,10 @@ OpenAPI/Swagger response parsing extracts bounded endpoint/method/parameter/secu
 ```sh
 python scripts/build-cyberrecon-deb.py
 python scripts/build-cyberrecon-deb.py --worker dist/cyberrecon-dns
-python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-3_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
+python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-4_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
 ```
 
-Without a Go worker the package architecture is `all`; with a worker it is the build host's architecture. Build the Go binary for that architecture. Dependencies use distribution packages and Python 3.12+, with no automatic pip installation in maintainer scripts. The launcher works independently of the current directory. Standard installation/update/uninstall is `sudo apt install ./cyberrecon_VERSION_ARCH.deb` / `sudo apt remove cyberrecon`; user-owned workspaces are preserved.
+Without a Go worker the package architecture is `all`; with a worker it is the build host's architecture. Build the Go binary for that architecture. Dependencies use distribution packages and Python 3.12+, with no automatic pip installation in maintainer scripts. The removal/upgrade hook uses Debian `py3clean -p cyberrecon` to clean package bytecode; it never touches user workspaces. The launcher works independently of the current directory. Standard installation/update/uninstall is `sudo apt install ./cyberrecon_VERSION_ARCH.deb` / `sudo apt remove cyberrecon`; user-owned workspaces are preserved.
 
 For local signing tests only, replace `--sign-key` with `--development-key` and choose a new empty output directory. The temporary private key is discarded; the repository includes its public key and fingerprint. This is **not a production trust root**. Operator keys must persist securely to sign future updates. Build scripts create local artifacts; they never publish or change host APT configuration.
 
@@ -54,7 +54,12 @@ APT metadata expires after seven days and must be regenerated and re-signed for 
 
 `python scripts/verify_cyberrecon_lab.py --tls` starts an ephemeral loopback TLS service, verifies native discovery/certificate metadata, scans that script-owned port with real Nmap when available, and generates reports under ignored `artifacts/`. Its temporary certificate key is discarded. No external targets are contacted. CI runs the Go race tests and this local TLS/Nmap check.
 
-Kali/Parrot installation, upgrades and uninstall still require validation on fresh supported installations. A `.deb` and signed local development repository have been built here, but neither distribution installation is validated. Operator identity, project license and public hosting must be finalized before redistribution. Dependencies may differ across Parrot releases.
+See [release qualification](docs/RELEASE_QUALIFICATION.md) for measured Kali/Parrot package lifecycle checks and exact image digests. These checks do not certify a graphical desktop VM or a production APT repository. Operator identity, project license and public hosting must be finalized before redistribution.
+
+The clean-image path qualified locally uses `--no-install-recommends` for APT
+dependency resolution. Default recommendations pull additional system packages
+that exceed the local single-UID namespace; that path still needs a privileged
+container/VM check. Nmap can be installed separately for explicit-IP port scans.
 
 ## Audit hardening and recovery
 
@@ -82,7 +87,7 @@ After stopping all scan processes for a project, recover hard-interrupted scans:
 cyberrecon recover PROJECT_ID
 cyberrecon --doctor --doctor-wordlist ./paths.txt
 python scripts/verify_cyberrecon_startup.py
-python scripts/verify_cyberrecon_package.py dist/audit/cyberrecon_0.2.0-3_all.deb
+python scripts/verify_cyberrecon_package.py dist/release-qualification/current/cyberrecon_0.2.0-4_all.deb
 python scripts/profile_cyberrecon.py
 ```
 
@@ -98,7 +103,7 @@ triggered `Kali and Parrot release qualification` workflow uses official
 [Kali containers](https://www.kali.org/docs/containers/official-kalilinux-docker-images/)
 and [Parrot containers](https://www.parrotsec.org/docs/containers/parrot-on-docker/),
 runs tests and checks actual prior-package upgrade/removal in disposable
-containers. It has not been executed in this workspace. Desktop/session and
+containers with captured failure evidence. The workflow itself has not been run here; local disposable-root results are documented separately. Desktop/session and
 privilege behavior still require supported-OS VM testing before a public release.
 Do not configure unsigned repositories or use `curl | bash`. Public
 `apt install cyberrecon` remains unavailable until a signed repository is hosted.
@@ -121,3 +126,11 @@ NVD processing isolates malformed entries and retains bounded advisory CVSS
 evidence; scores do not establish target applicability or override backport
 uncertainty. Paid providers and external-engine compatibility still require
 separate qualification.
+
+## Release qualification follow-up
+
+Debian revision 0.2.0-4 adds the required NumPy graph dependency, aligns tested
+NetworkX >=3.2.1 and Plotly >=5.20 support with distro packages, and cleans
+package bytecode on removal/upgrade. Python remains >=3.12. Doctor now checks
+NumPy and dependency patch versions. See [release qualification](docs/RELEASE_QUALIFICATION.md)
+for supported/tested versions, real lifecycle evidence, and remaining gates.

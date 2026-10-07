@@ -17,7 +17,7 @@ package __init__; it does not include or expose the CyberIntel GUI.
 
 There is one Python distribution metadata file, pyproject.toml, named
 cyberintel-suite version 0.1.0 for compatibility. The CyberRecon application and
-Go protocol report 0.2.0; Debian uses 0.2.0-2. These are different version layers,
+Go protocol report 0.2.0; Debian now uses 0.2.0-4 (see release qualification). These are different version layers,
 not duplicate distributions. Renaming the distribution requires an explicit
 migration/release plan. The two console commands have distinct names and do not
 conflict: cyberrecon -> cyberrecon.cli; cyberintel -> cyberintel.app. launcher.py
@@ -131,3 +131,11 @@ resume scheduling, license/maintainer identity and production APT hosting remain
 incomplete. READY means a supported CLI family, not fully qualified integration.
 Next phase: run the prepared distribution qualification and real desktop VM
 checks; fix measured failures before extracting shared compatibility utilities.
+
+## Release qualification follow-up
+
+[RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md) supersedes the earlier
+NOT TESTED package lifecycle status with actual disposable official-image
+Kali/Parrot results, without claiming a desktop VM certification. Revision 4
+fixes measured dependency and bytecode-removal failures; no shared utility
+extraction, compatibility deletion or pipeline rewrite was performed.
