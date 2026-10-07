@@ -7,6 +7,8 @@ from cyberintel.models import ValidationError
 
 
 def host_of(value):
+    if not isinstance(value, str) or len(value) > 4096 or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValidationError("Invalid target text or control characters.")
     value = value.strip()
     if "://" in value:
         parts = urlsplit(value)
@@ -24,6 +26,8 @@ def host_of(value):
 
 
 def rule(value):
+    if not isinstance(value, str) or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValidationError("Scope rules must be text without control characters.")
     value = value.strip()
     if "://" in value:
         raise ValidationError("Scope rules must be domain names, IPs or CIDRs. Enter URLs as scan targets, not scope rules.")
@@ -50,7 +54,7 @@ class Scope:
     exclude: tuple = ()
 
     def __post_init__(self):
-        if isinstance(self.include, str) or isinstance(self.exclude, str) or len(self.include) + len(self.exclude) > 2048:
+        if not isinstance(self.include, (tuple, list)) or not isinstance(self.exclude, (tuple, list)) or len(self.include) + len(self.exclude) > 2048:
             raise ValidationError("Scope requires rule lists with at most 2048 entries.")
         object.__setattr__(self, "include", tuple(dict.fromkeys(rule(value) for value in self.include)))
         object.__setattr__(self, "exclude", tuple(dict.fromkeys(rule(value) for value in self.exclude)))

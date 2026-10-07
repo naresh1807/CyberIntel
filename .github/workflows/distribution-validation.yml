@@ -1,0 +1,69 @@
+name: Kali and Parrot release qualification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  distribution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [kalilinux/kali-rolling:latest, parrotsec/core:latest]
+    container:
+      image: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - name: Install build/test dependencies in disposable distro container
+        run: |
+          cat /etc/os-release
+          apt-get update
+          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run source tests on distribution Python
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -e '.[dev]'
+          .venv/bin/python -m pytest -q
+          .venv/bin/python scripts/verify_cyberrecon_startup.py
+          .venv/bin/python scripts/verify_cyberrecon_lab.py --tls
+      - name: Go race tests
+        working-directory: workers/dns
+        run: go test -race ./...
+      - name: Build previous and current Debian packages
+        run: |
+          mkdir -p /tmp/cyberrecon-prior
+          git archive --output=/tmp/cyberrecon-prior.tar 5718fdb
+          tar -xf /tmp/cyberrecon-prior.tar -C /tmp/cyberrecon-prior
+          python3 /tmp/cyberrecon-prior/scripts/build-cyberrecon-deb.py --output /tmp/cyberrecon-prior-dist
+          python3 scripts/build-cyberrecon-deb.py --output dist/qualification
+      - name: Install previous package and preserve user data across upgrade
+        run: |
+          apt-get install -y --no-install-recommends /tmp/cyberrecon-prior-dist/cyberrecon_0.2.0-1_all.deb
+          echo 'CYBERRECON_HOME=/tmp/cyberrecon-lifecycle-workspace' >> "$GITHUB_ENV"
+          CYBERRECON_HOME=/tmp/cyberrecon-lifecycle-workspace cyberrecon project 'Lifecycle fixture' --include 127.0.0.1 --authority 'Own container fixture'
+          echo '{"fixture":true}' > /tmp/cyberrecon-lifecycle-workspace/user-config.json
+          apt-get install -y --no-install-recommends ./dist/qualification/cyberrecon_0.2.0-2_all.deb
+      - name: Validate installed package and upgraded database
+        run: |
+          python3 --version
+          cyberrecon --version
+          cyberrecon --help
+          cyberrecon --doctor
+          cyberrecon projects
+          python3 scripts/verify_cyberrecon_startup.py --package
+          python3 -c "import os,sqlite3; db=sqlite3.connect(os.environ['CYBERRECON_HOME']+'/cyberrecon.db'); assert db.execute('PRAGMA user_version').fetchone()[0]==3; assert db.execute('SELECT count(*) FROM projects').fetchone()[0]==1"
+      - name: Verify removal and purge preserve user workspace
+        run: |
+          apt-get remove -y cyberrecon
+          test -f "$CYBERRECON_HOME/cyberrecon.db"
+          test -f "$CYBERRECON_HOME/user-config.json"
+          test ! -e /usr/bin/cyberrecon
+          apt-get purge -y cyberrecon
+          test -f "$CYBERRECON_HOME/cyberrecon.db"
+          test -f "$CYBERRECON_HOME/user-config.json"

@@ -34,6 +34,17 @@ def extract(response, body, scope):
                 break
         except (ValueError, KeyError, TypeError):
             continue
+    if data.get("swagger") and isinstance(data.get("basePath"), str):
+        try:
+            parts = urlsplit(url)
+            host = data.get("host", parts.netloc)
+            if not isinstance(host, str):
+                raise ValueError("Invalid Swagger host")
+            candidate = clean_url(parts.scheme + "://" + host + data["basePath"].rstrip("/") + "/")
+            if scope.allows(candidate):
+                base = candidate
+        except ValueError:
+            pass
     for path, operations in list(data["paths"].items())[:500]:
         if not isinstance(path, str) or not path.startswith("/") or not isinstance(operations, dict):
             continue
@@ -49,12 +60,15 @@ def extract(response, body, scope):
             if not isinstance(operation, dict):
                 continue
             parameters = operation.get("parameters", [])
-            for parameter in (parameters if isinstance(parameters, list) else [])[:100]:
+            inherited = operations.get("parameters", [])
+            parameters = (parameters if isinstance(parameters, list) else []) + (inherited if isinstance(inherited, list) else [])
+            for parameter in parameters[:100]:
                 if isinstance(parameter, dict) and isinstance(parameter.get("name"), str):
                     names.add(parameter["name"][:200])
         records.append({"url": endpoint, "classification": "documented endpoint (unverified)", "methods": methods,
                         "parameter_names": sorted(names), "documentation_url": url,
                         "spec_version": str(data.get("openapi") or data.get("swagger"))[:30],
-                        "declares_security": bool(data.get("security")) or any(bool(value.get("security")) for value in operations.values() if isinstance(value, dict)),
+                        "declares_security": any(bool(operations[method.lower()].get("security", data.get("security")))
+                                                 for method in methods if isinstance(operations.get(method.lower()), dict)),
                         "note": "Documented methods and schemas do not establish reachable or vulnerable endpoints."})
     return records

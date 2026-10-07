@@ -19,7 +19,7 @@ def test_scope_history_migrates_and_records_replacements(tmp_path):
     history = reopened.scope_history(project)
     assert history[-1]["scope"]["include"] == ["other.org"]
     with sqlite3.connect(reopened.path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
 
 
 def test_invalid_scan_export_has_no_directory_side_effect(tmp_path):

@@ -15,10 +15,10 @@ def build(output, worker=None):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     version = module.__version__
-    architecture = subprocess.check_output(["dpkg", "--print-architecture"], text=True).strip() if worker else "all"
+    architecture = subprocess.check_output(["dpkg", "--print-architecture"], text=True, timeout=10).strip() if worker else "all"
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    destination = output / f"cyberrecon_{version}-1_{architecture}.deb"
+    destination = output / f"cyberrecon_{version}-2_{architecture}.deb"
     if destination.is_symlink():
         raise ValueError("Package destination cannot be a symlink.")
     with tempfile.TemporaryDirectory(prefix="cyberrecon-deb-") as temporary:
@@ -47,9 +47,12 @@ def build(output, worker=None):
         documentation = stage / "usr/share/doc/cyberrecon"
         documentation.mkdir(parents=True)
         shutil.copy2(ROOT / "CYBERRECON.md", documentation / "README.md")
+        shutil.copytree(ROOT / "docs", documentation / "docs")
+        (documentation / "workers").mkdir()
+        shutil.copy2(ROOT / "workers/README.md", documentation / "workers/README.md")
         (documentation / "copyright").write_text("CyberRecon development package.\nProject licensing must be finalized before public redistribution.\n")
-        (control / "control").write_text(f"Package: cyberrecon\nVersion: {version}-1\nSection: net\nPriority: optional\nArchitecture: {architecture}\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython, python3-pyside6.qtwidgets, python3-networkx, python3-plotly, python3-reportlab\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n")
-        subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(stage), str(destination)], check=True)
+        (control / "control").write_text(f"Package: cyberrecon\nVersion: {version}-2\nSection: net\nPriority: optional\nArchitecture: {architecture}\nMaintainer: CyberRecon development team <development@invalid.example>\nDepends: python3 (>= 3.12), python3-httpx (>= 0.28), python3-dnspython, python3-pyside6.qtwidgets, python3-networkx, python3-plotly, python3-reportlab\nRecommends: nmap, subfinder, whatweb, ffuf\nDescription: Authorized reconnaissance project and scan workspace\n Scope-controlled discovery, observation storage, comparisons and reports.\n This development package requires Kali/Parrot installation validation.\n")
+        subprocess.run(["dpkg-deb", "--root-owner-group", "--build", str(stage), str(destination)], check=True, timeout=120)
     return destination
 
 

@@ -79,3 +79,22 @@ No real-world targets or paid providers were queried. Shodan/Censys and NVD
 contracts use mocked transports. Debian and signed development APT artifacts
 are available, but clean Kali/Parrot installation, upgrade and uninstall remain
 unverified; this is not a completed production release.
+
+## CyberRecon full audit and hardening — 2026-10-07
+
+See [docs/AUDIT.md](docs/AUDIT.md) for verified findings, adapter inventory,
+remediation and remaining release limits, and [docs/SCHEMAS.md](docs/SCHEMAS.md)
+for canonical data contracts. This phase preserves both existing applications.
+
+Fixed resolved-IP scope bypasses in standalone active adapters, credential
+redirects across ports, managed directory/evidence export protection, subprocess
+limits/errors, multi-source/DNS normalization, interrupted scan recovery,
+version/dependency Doctor checks and GUI blocking/detail gaps. Database schema 3
+migrates existing projects and preserves scan history. Python >=3.12 is consistent.
+
+Validation: 367 Python tests passed; three Go race tests and go vet passed;
+loopback TLS/real Nmap, reports, offscreen GUI startup, Debian staging and local
+development APT signing passed. Coverage percentage is unavailable. Actual clean
+Kali/Parrot install/upgrade/remove and a graphical desktop session remain untested;
+the added manually triggered distribution workflow is prepared but not executed.
+These changes do not constitute production certification or hosted APT publication.

@@ -1,21 +1,11 @@
 import argparse
 import json
-import shutil
 import sqlite3
 import sys
 
 from . import __version__
-from .engines import TOOLS
+from .doctor import doctor
 from .storage import Repository, compare_snapshots
-
-
-def doctor():
-    return {"version": __version__, "python": sys.version.split()[0],
-            "tools": {name: {"on_path": bool(shutil.which(name)), "capability": capability}
-                      for name, capability in TOOLS.items()},
-            "notes": ["PATH presence does not establish compatible engine versions (especially the two unrelated httpx executables).",
-                      "JSONL import supports dnsx, ProjectDiscovery httpx, naabu and katana; imports are unverified.",
-                      "No personal-data lookup or automatic exploitation is included."]}
 
 
 def main(argv=None):
@@ -23,6 +13,7 @@ def main(argv=None):
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--doctor", action="store_true")
     parser.add_argument("--home", help="Workspace directory")
+    parser.add_argument("--doctor-wordlist", help="Optional wordlist path to check locally")
     commands = parser.add_subparsers(dest="command")
     project = commands.add_parser("project", help="Create an authorized scope")
     project.add_argument("name")
@@ -55,6 +46,8 @@ def main(argv=None):
     run.add_argument("--ca-bundle", help="Additional trusted PEM CA certificates for an authorized lab; TLS verification stays enabled")
     run.add_argument("--ports", default=None, help="Explicit IP targets only; empty string selects top 100 TCP ports")
     run.add_argument("--udp", action="store_true")
+    recovery = commands.add_parser("recover", help="Mark unfinished scans interrupted; use only after stopping scan processes")
+    recovery.add_argument("project")
     listing = commands.add_parser("scans")
     listing.add_argument("project")
     export = commands.add_parser("export")
@@ -65,7 +58,7 @@ def main(argv=None):
     compare.add_argument("after")
     args = parser.parse_args(argv)
     if args.doctor:
-        print(json.dumps(doctor(), indent=2))
+        print(json.dumps(doctor(args.home, args.doctor_wordlist), indent=2))
         return 0
     try:
         repo = Repository(args.home)
@@ -79,6 +72,8 @@ def main(argv=None):
         elif args.command == "import-engine":
             from .importers import import_jsonl
             result = import_jsonl(repo, args.project, args.target, args.engine, args.file)
+        elif args.command == "recover":
+            result = repo.recover(args.project)
         elif args.command == "scans":
             result = repo.scans(args.project)
         elif args.command == "scope-import":
@@ -116,6 +111,9 @@ def main(argv=None):
             return launch(repo)
         print(json.dumps(result, indent=2))
         return 0
+    except KeyboardInterrupt:
+        print("Cancelled by operator; collected observations preserved.", file=sys.stderr)
+        return 130
     except (ValueError, OSError, RecursionError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 2

@@ -20,7 +20,7 @@ def identify(record):
 
 
 def assess(product, version, payload):
-    result = {"product": product, "version": version, "status": "UNKNOWN", "confidence": "unknown",
+    result = {"product": product, "version": version, "status": "UNKNOWN", "risk_status": "UNKNOWN", "confidence": "unknown",
               "retrieved_at": utcnow(), "source": "https://endoflife.date/api/v1/products/" + product,
               "reason": "No matching release cycle or usable version evidence.",
               "next_step": "Verify installed package, vendor support policy and distribution backports. EOL is not proof of a CVE."}
@@ -38,7 +38,8 @@ def assess(product, version, payload):
     state = cycle.get("isEol")
     if not isinstance(state, bool):
         return result
-    result.update(status="EOL" if state else "NOT_EOL", confidence="release-cycle-match",
+    result.update(status="EOL" if state else "NOT_EOL",
+                  risk_status="KNOWN_EOL_CONDITION" if state else "NO_KNOWN_LIFECYCLE_ISSUE", confidence="release-cycle-match",
                   cycle=cycle["name"], eol_date=cycle.get("eolFrom"), intelligence_generated_at=payload.get("generated_at"),
                   reason="Upstream lifecycle provider matched the observed version to a release cycle; installed package is unverified.")
     return result
@@ -83,10 +84,8 @@ def normalized_cpe(value):
 
 
 def enrich_cves(repository, scan, transport=None, cancel=None):
-    from types import SimpleNamespace
-    from urllib.parse import urlencode
-    from cyberintel.connectors import Collector
-    collector = Collector(SimpleNamespace(timeout_seconds=8), None, transport=transport)
+    client = ScopedHTTP(lambda: Scope(("services.nvd.nist.gov",)), max_requests=3,
+                        transport=transport, cancel=cancel)
     candidates = {}
     for record in repository.snapshot(scan)["technologies"]:
         for value in record.get("cpe", []):
@@ -106,9 +105,12 @@ def enrich_cves(repository, scan, transport=None, cancel=None):
                     break
             else:
                 time.sleep(6)
-        url = "https://services.nvd.nist.gov/rest/json/cves/2.0?" + urlencode({"cpeName": cpe, "isVulnerable": "", "resultsPerPage": 50})
+        url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         try:
-            payload, _, _ = collector._request("GET", url, attempts=1, timeout_seconds=8)
+            response = client.fetch(url, parameters={"cpeName": cpe, "isVulnerable": "", "resultsPerPage": 50})
+            if response["status_code"] != 200 or response["truncated"]:
+                raise ValueError("NVD response unavailable or oversized.")
+            payload = json.loads(response["text"])
             if not isinstance(payload, dict) or not isinstance(payload.get("vulnerabilities"), list):
                 raise ValueError("Malformed NVD response.")
             if payload.get("totalResults", 0) > 50:
@@ -121,14 +123,14 @@ def enrich_cves(repository, scan, transport=None, cancel=None):
                 description = next((item["value"][:1500] for item in cve.get("descriptions", []) if item.get("lang") == "en"), "")
                 repository.save(scan, "findings", identifier + ":" + cpe, {
                     "cve_id": identifier, "description": description, "matched_cpe": cpe, "technology_keys": assets,
-                    "classification": "CVE candidate", "confirmed_vulnerability": False,
+                    "classification": "CVE candidate", "risk_status": "POTENTIALLY_AFFECTED", "confirmed_vulnerability": False,
                     "published": cve.get("published"), "intel_last_modified": cve.get("lastModified"),
                     "reference": "https://nvd.nist.gov/vuln/detail/" + identifier,
                     "reason": "NVD associated an observed versioned CPE with this advisory; installed package and applicability are unverified.",
                     "next_step": "Verify vendor advisory, installed package, configuration, affected ranges and distribution backports."},
                     "NVD CVE API 2.0", confidence="candidate-requires-validation")
         except Exception as exc:
-            warnings.append("NVD: " + str(exc))
+            warnings.append("NVD: " + type(exc).__name__ + "; provider lookup failed.")
     if not candidates:
         warnings.append("NVD skipped: no usable versioned CPE evidence; absence of a match does not establish safety.")
     return warnings

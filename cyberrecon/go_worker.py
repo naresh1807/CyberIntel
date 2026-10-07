@@ -6,12 +6,17 @@ from pathlib import Path
 from .engines import run_process
 
 
-def resolve_hosts(hosts, scope, cancel=None):
+def worker_path():
     executable = shutil.which("cyberrecon-dns")
     if not executable:
         candidate = Path(__file__).resolve().parent.parent / "dist" / "cyberrecon-dns"
         if candidate.is_file():
             executable = str(candidate)
+    return executable
+
+
+def resolve_hosts(hosts, scope, cancel=None):
+    executable = worker_path()
     if not executable:
         raise ValueError("Go worker unavailable; build workers/dns or install cyberrecon-dns on PATH.")
     hosts = list(dict.fromkeys(scope.require(host) for host in hosts))[:30]

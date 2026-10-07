@@ -1,6 +1,8 @@
 # CyberIntel Suite
 
-The new **CyberRecon** entry point implements an initial portion of the advanced reconnaissance specification. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon.cli --help` or launch the desktop with `.venv/bin/python -m cyberrecon.cli`.
+The new **CyberRecon** entry point implements an bounded reconnaissance workflow with incremental security hardening. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon.cli --help` or launch the desktop with `.venv/bin/python -m cyberrecon.cli`.
+
+The verified audit, fixes, test results and release limits are in [docs/AUDIT.md](docs/AUDIT.md). CyberRecon requires an explicit project authorization reference and enforces include/exclude scope before active requests. Run `.venv/bin/cyberrecon --doctor` for bounded local tool/version/dependency checks.
 
 For step-by-step instructions, see the [User Manual](USER_MANUAL.md).
 
@@ -8,9 +10,9 @@ A modular Python desktop application for public intelligence collection and auth
 
 This is version **0.1.0**, a tested development release, not a claim of production certification. All pages invoke implemented services. Credential-dependent providers and external tools report errors when unavailable; they never substitute synthetic results.
 
-## Run on this Windows workspace
+## Optional Windows development
 
-The dependencies have already been installed in `.venv`:
+For an existing Windows virtual environment:
 
 ```powershell
 .\.venv\Scripts\python.exe -m cyberintel
@@ -18,9 +20,9 @@ The dependencies have already been installed in `.venv`:
 
 The app opens directly into the local workspace, with no login or registration. Although Linux is the deployment target, the desktop and tabular analysis also run on Windows. TShark must be installed separately for PCAP analysis.
 
-## Kali Linux / Ubuntu installation
+## Kali Linux / Parrot Security OS installation
 
-Use Python 3.11 or newer; Ubuntu 24.04+ and current Kali installations are the intended targets. Run as a regular desktop user, not root.
+Use Python 3.12 or newer. Kali Linux and Parrot Security OS are the primary release targets; clean distribution qualification remains pending. Run as a regular desktop user, not root.
 
 ```bash
 bash scripts/install-linux.sh
@@ -39,7 +41,7 @@ python3 -m venv .venv
 .venv/bin/python -m cyberintel
 ```
 
-If an older Ubuntu installation has Python 3.10, use an OS-supported Python 3.11+ installation or upgrade the OS before creating the virtual environment.
+If your distribution ships Python older than 3.12, upgrade through distribution-supported packages before creating the virtual environment.
 
 ## Implemented workflow
 

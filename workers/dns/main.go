@@ -150,6 +150,14 @@ func run(input io.Reader, output io.Writer) error {
 	return writeErr
 }
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("cyberrecon-dns 0.2.0")
+		return
+	}
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, "unsupported arguments")
+		os.Exit(1)
+	}
 	if err := run(os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

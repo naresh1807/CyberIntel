@@ -14,7 +14,9 @@ import dns.resolver
 import httpx
 
 from . import engines
+from .errors import operation_error
 from .network import ScopedHTTP, clean_url
+from .normalization import dns_attributes, dns_key
 from .scope import host_of
 
 
@@ -60,6 +62,12 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
     progress = progress or (lambda message: None)
     scope = lambda: repository.scope(project)
     save = lambda kind, key, value, source, **kw: repository.save(identifier, kind, key, value, source, **kw)
+    def warn(message, exc=None):
+        code, detail = operation_error(exc) if exc is not None else ("coverage_warning", message)
+        message = message + ": " + detail if exc is not None else message
+        warnings.append(message)
+        save("errors", str(len(warnings)), {"code": code, "message": message}, "scan workflow", confidence="diagnostic")
+
     def edge(left, right, relation):
         save("relationships", left + "|" + relation + "|" + right,
              dict(from_node=left, to_node=right, relation=relation), "correlation")
@@ -80,16 +88,16 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                     details = json.loads(metadata)
                     warnings.extend(details["warnings"])
                     if details["truncated"]:
-                        warnings.append("Certificate provider coverage is incomplete.")
+                        warn("Certificate provider coverage is incomplete.")
             except Exception as exc:
-                warnings.append(f"Passive discovery {passive}: {exc}")
+                warn(f"Passive discovery {passive}", exc)
                 names = []
             hosts.update(names)
             for host in names:
                 save("subdomains", host, {"host": host, "verified_current": False}, passive, historical=passive == "ct")
                 edge("domain:" + root, "host:" + host, "contains")
         if len(hosts) > 30:
-            warnings.append("Host budget reached; only the first 30 sorted hosts were processed.")
+            warn("Host budget reached; only the first 30 sorted hosts were processed.")
         http = ScopedHTTP(scope, transport=transport, cancel=cancel, verify=verification)
         effective_go_dns = False
         if go_dns and hosts and not cancel.is_set():
@@ -99,15 +107,15 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                 go_results = resolve_hosts(sorted(hosts)[:30], scope(), cancel)
                 effective_go_dns = True
             except Exception as exc:
-                warnings.append("Go DNS unavailable; using the Python resolver: " + str(exc))
+                warn("Go DNS unavailable; using the Python resolver", exc)
                 go_results = []
             for row in go_results:
                 scope().require(row["host"])
                 if row.get("error"):
-                    warnings.append("Go DNS " + row["host"] + ": " + row["error"])
+                    warn("Go DNS " + row["host"] + ": " + row["error"])
                 for value in row["addresses"]:
                     family = "A" if ipaddress.ip_address(value).version == 4 else "AAAA"
-                    save("dns", row["host"] + ":" + family + ":" + hashlib.sha256(value.encode()).hexdigest(),
+                    save("dns", dns_key(row["host"], family, value),
                          {"host": row["host"], "type": family, "value": value}, "Go DNS worker")
                     edge("host:" + row["host"], "ip:" + value, "resolves_to")
         for host in sorted(hosts)[:30]:
@@ -136,14 +144,15 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                             value = str(entry)
                             stored = {"host": host, "type": family, "ttl": answer.rrset.ttl}
                             stored.update({"sha256": hashlib.sha256(value.encode()).hexdigest(), "redacted": True}
-                                          if family == "TXT" else {"value": value})
-                            save("dns", host + ":" + family + ":" + hashlib.sha256(value.encode()).hexdigest(), stored, "DNS resolver")
+                                          if family == "TXT" else dns_attributes(family, value))
+                            key_value = stored.get("value", value)
+                            save("dns", dns_key(host, family, key_value), stored, "DNS resolver")
                             if family in {"A", "AAAA"}:
                                 edge("host:" + host, "ip:" + value, "resolves_to")
                     except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
                         continue
                     except Exception as exc:
-                        warnings.append(f"DNS {host} {family}: {type(exc).__name__}")
+                        warn(f"DNS {host} {family}", exc)
             initial = clean_url(target) if "://" in target and host == root else "https://" + (f"[{host}]" if ":" in host else host) + "/"
             queue, seen = deque([(initial, 0)]), set()
             baseline = None
@@ -155,7 +164,7 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                                 "bytes_read": control_response["bytes_read"], "body_sha256": control_response["body_sha256"]}
                     save("http", control_response["url"], {**baseline, "purpose": "content discovery negative control"}, "scoped HTTP")
                 except Exception as exc:
-                    warnings.append("Content discovery calibration unavailable: " + str(exc))
+                    warn("Content discovery calibration unavailable", exc)
             for word in words:
                 queue.append((clean_url(word, initial.rstrip("/") + "/"), 2))
             while queue and len(seen) < 30 and not cancel.is_set():
@@ -252,27 +261,27 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                         except ValueError:
                             continue
                 except Exception as exc:
-                    warnings.append(f"HTTP {url}: {type(exc).__name__}: {exc}")
+                    warn(f"HTTP {url}", exc)
             if queue:
-                warnings.append(f"Crawl page limit reached for {host}.")
+                warn(f"Crawl page limit reached for {host}.")
         if history and not cancel.is_set():
             progress("Historical URLs: " + history)
             try:
                 urls, _ = engines.historical_urls(history, root, scope(), cancel)
             except Exception as exc:
-                warnings.append(f"Historical {history}: {exc}")
+                warn(f"Historical {history}", exc)
                 urls = []
             for url in urls[:5000]:
                 save("historical", url, {"url": url, "verified_current": url in verified_urls}, history, historical=True)
             if len(urls) > 5000:
-                warnings.append("Historical URL limit reached.")
+                warn("Historical URL limit reached.")
         if ports is not None and not cancel.is_set():
             progress("Nmap service inventory: " + root)
             try:
                 records, raw = engines.port_scan(root, scope(), ports, udp, cancel)
                 evidence = repository.evidence(identifier, "nmap.xml", raw)
             except Exception as exc:
-                warnings.append("Nmap unavailable or incomplete: " + str(exc))
+                warn("Nmap unavailable or incomplete", exc)
                 records, evidence = {"records": [], "hosts": []}, None
             for row in records["records"]:
                 key = f'{row["ip"]}:{row["protocol"]}:{row["port"]}'
@@ -285,9 +294,9 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                          "cpe": row["cpe"], "lifecycle": "UNKNOWN", "note": "Validate version and distribution backports before assessing CVEs."}, "Nmap", confidence="engine-observed")
             for row in records["hosts"]:
                 if row["timed_out"]:
-                    warnings.append("Nmap host timed out; port inventory may be incomplete: " + row["ip"])
+                    warn("Nmap host timed out; port inventory may be incomplete: " + row["ip"])
         if not hosts:
-            warnings.append("No active hosts authorized/discovered. Wildcard scope does not authorize its apex.")
+            warn("No active hosts authorized/discovered. Wildcard scope does not authorize its apex.")
         if lifecycle and not cancel.is_set():
             progress("Upstream release lifecycle lookup")
             from .intelligence import enrich
@@ -296,8 +305,11 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
             progress("NVD CPE candidate lookup")
             from .intelligence import enrich_cves
             warnings.extend(enrich_cves(repository, identifier, cancel=cancel))
+    except KeyboardInterrupt:
+        repository.finish(identifier, warnings + ["Interrupted by operator."], cancelled=True)
+        raise
     except Exception as exc:
-        warnings.append(f"Workflow: {type(exc).__name__}: {exc}")
+        warn("Workflow", exc)
         repository.finish(identifier, warnings, failed=True, cancelled=cancel.is_set())
         return identifier
     repository.finish(identifier, warnings, cancelled=cancel.is_set())

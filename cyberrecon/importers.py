@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from .network import clean_url
+from .normalization import dns_attributes, dns_key
 from .scope import host_of
 
 ENGINES = {"dnsx", "httpx", "naabu", "katana"}
@@ -24,28 +25,35 @@ def import_jsonl(repository, project, target, engine, filename):
             if not line.strip():
                 continue
             try:
+                pending = []
                 row = json.loads(line)
                 if not isinstance(row, dict):
                     raise ValueError("Expected object")
                 if engine == "katana":
                     url = clean_url(row["request"]["endpoint"])
                     scope.require(url)
-                    records.append(("urls", url, {"url": url, "verified": False}))
+                    pending.append(("urls", url, {"url": url, "verified": False}))
                 elif engine == "httpx":
                     url = clean_url(row["url"])
                     scope.require(url)
                     status = int(row["status_code"]) if row.get("status_code") is not None else None
                     if status is not None and not 100 <= status <= 599:
                         raise ValueError("Invalid HTTP status")
-                    records.append(("http", url, {"url": url, "status_code": status,
+                    pending.append(("http", url, {"url": url, "status_code": status,
                                    "technologies": [str(value)[:100] for value in row.get("tech", [])[:50]]}))
                 elif engine == "dnsx":
                     host = host_of(row["host"])
                     scope.require(host)
                     for family in ("a", "aaaa", "cname", "mx", "ns"):
-                        for value in row.get(family, [])[:100]:
-                            value = str(value)[:512]
-                            records.append(("dns", host + ":" + family + ":" + value, {"host": host, "type": family.upper(), "value": value}))
+                        values = row.get(family, [])
+                        if not isinstance(values, list):
+                            raise ValueError("DNS values must be arrays")
+                        for value in values[:100]:
+                            if not isinstance(value, str) or len(value) > 512:
+                                raise ValueError("Invalid DNS value")
+                            attributes = dns_attributes(family, value)
+                            key = dns_key(host, family, attributes["value"])
+                            pending.append(("dns", key, {"host": host, "type": family.upper(), **attributes}))
                 else:
                     host = host_of(row.get("ip") or row["host"])
                     scope.require(host)
@@ -55,7 +63,8 @@ def import_jsonl(repository, project, target, engine, filename):
                     protocol = row.get("protocol", "tcp")
                     if protocol not in {"tcp", "udp"}:
                         raise ValueError("Invalid protocol")
-                    records.append(("ports", f"{host}:{protocol}:{port}", {"host": host, "port": port, "protocol": protocol}))
+                    pending.append(("ports", f"{host}:{protocol}:{port}", {"host": host, "port": port, "protocol": protocol}))
+                records.extend(pending)
             except (ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
                 rejected += 1
             if len(records) > 10000:

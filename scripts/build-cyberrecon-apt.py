@@ -22,7 +22,7 @@ def build(packages, output, signing_key=None, development_key=False):
         path = Path(package).resolve()
         if path.suffix != ".deb":
             raise ValueError("Only .deb packages are accepted.")
-        architecture = subprocess.check_output(["dpkg-deb", "-f", str(path), "Architecture"], text=True).strip()
+        architecture = subprocess.check_output(["dpkg-deb", "-f", str(path), "Architecture"], text=True, timeout=10).strip()
         if architecture not in {"all", "amd64", "arm64"}:
             raise ValueError("Unsupported package architecture: " + architecture)
         architectures.add(architecture)
@@ -32,7 +32,7 @@ def build(packages, output, signing_key=None, development_key=False):
     if "all" in architectures:
         architectures.update({"amd64", "arm64"})
         architectures.remove("all")
-    packages_data = subprocess.check_output(["apt-ftparchive", "packages", "pool"], cwd=root)
+    packages_data = subprocess.check_output(["apt-ftparchive", "packages", "pool"], cwd=root, timeout=60)
     # Generate per-architecture indices, including Architecture: all entries.
     for architecture in sorted(architectures):
         index = root / "dists/stable/main" / ("binary-" + architecture)
@@ -49,28 +49,28 @@ def build(packages, output, signing_key=None, development_key=False):
                "-o", "APT::FTPArchive::Release::Components=main",
                "-o", "APT::FTPArchive::Release::Architectures=" + " ".join(sorted(architectures)), "release", "dists/stable"]
     validity = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%a, %d %b %Y %H:%M:%S +0000")
-    release.write_bytes(subprocess.check_output(options, cwd=root) + ("Valid-Until: " + validity + "\n").encode())
+    release.write_bytes(subprocess.check_output(options, cwd=root, timeout=60) + ("Valid-Until: " + validity + "\n").encode())
     with tempfile.TemporaryDirectory(prefix="cyberrecon-signing-") as temporary:
         environment = os.environ.copy()
         if development_key:
             environment["GNUPGHOME"] = temporary
             subprocess.run(["gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "", "--quick-generate-key",
-                "CyberRecon development only <development@invalid.example>", "ed25519", "sign", "1d"], env=environment, check=True, stdout=subprocess.DEVNULL)
-            keys = subprocess.check_output(["gpg", "--batch", "--with-colons", "--list-secret-keys"], env=environment, text=True)
+                "CyberRecon development only <development@invalid.example>", "ed25519", "sign", "1d"], env=environment, check=True, stdout=subprocess.DEVNULL, timeout=60)
+            keys = subprocess.check_output(["gpg", "--batch", "--with-colons", "--list-secret-keys"], env=environment, text=True, timeout=60)
             signing_key = next(line.split(":")[9] for line in keys.splitlines() if line.startswith("fpr:"))
         if not signing_key:
             raise ValueError("Provide --sign-key or explicitly select --development-key.")
         base = ["gpg", "--batch", "--yes", "--local-user", signing_key]
-        subprocess.run([*base, "--output", str(release.with_name("InRelease")), "--clearsign", str(release)], env=environment, check=True)
-        subprocess.run([*base, "--output", str(release.with_name("Release.gpg")), "--detach-sign", str(release)], env=environment, check=True)
+        subprocess.run([*base, "--output", str(release.with_name("InRelease")), "--clearsign", str(release)], env=environment, check=True, timeout=60)
+        subprocess.run([*base, "--output", str(release.with_name("Release.gpg")), "--detach-sign", str(release)], env=environment, check=True, timeout=60)
         keyring = root / "cyberrecon-archive-keyring.gpg"
-        keyring.write_bytes(subprocess.check_output(["gpg", "--batch", "--export", signing_key], env=environment))
-        subprocess.run(["gpgv", "--keyring", str(keyring), str(release.with_name("InRelease"))], check=True)
+        keyring.write_bytes(subprocess.check_output(["gpg", "--batch", "--export", signing_key], env=environment, timeout=60))
+        subprocess.run(["gpgv", "--keyring", str(keyring), str(release.with_name("InRelease"))], check=True, timeout=30)
         (root / "SIGNING.txt").write_text("Signing key: " + signing_key + "\n" +
             ("DEVELOPMENT ONLY. Private key discarded; use an operator-managed key for releases and upgrades.\n" if development_key else
              "Operator-managed signing key. Validate fingerprint through a trusted channel before configuring APT.\n"))
         if development_key:
-            subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=environment, check=True)
+            subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=environment, check=True, timeout=60)
     return root
 
 

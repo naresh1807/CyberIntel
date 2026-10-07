@@ -2,7 +2,7 @@
 import json
 import threading
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, QUrl
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, QUrl, Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
@@ -46,6 +46,7 @@ class ObservationTable(QWidget):
                 value = record.get(key, "")
                 text = json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else str(value)
                 item = QTableWidgetItem(text[:500])
+                item.setData(Qt.UserRole, record)
                 item.setToolTip(text[:10000])
                 self.table.setItem(index, column, item)
         self.table.resizeColumnsToContents()
@@ -71,8 +72,7 @@ class ObservationTable(QWidget):
         layout = QVBoxLayout(dialog)
         view = QTextEdit()
         view.setReadOnly(True)
-        values = {self.table.horizontalHeaderItem(index).text(): self.table.item(row, index).toolTip()
-                  for index in range(self.table.columnCount())}
+        values = self.table.item(row, column).data(Qt.UserRole)
         view.setPlainText(json.dumps(values, indent=2))
         layout.addWidget(view)
         dialog.exec()
@@ -111,6 +111,20 @@ class ProviderWorker(QRunnable):
             self.signals.done.emit(host_lookup(*self.args, cancel=self.cancel))
         except Exception as exc:
             self.signals.error.emit(str(exc))
+
+
+class LocalWorker(QRunnable):
+    """Keep local diagnostics and potentially large report/graph work off the UI."""
+    def __init__(self, operation):
+        super().__init__()
+        self.operation = operation
+        self.signals = Signals()
+
+    def run(self):
+        try:
+            self.signals.done.emit(self.operation())
+        except Exception as exc:
+            self.signals.error.emit(type(exc).__name__ + ": local operation failed.")
 
 
 class Window(QMainWindow):
@@ -205,12 +219,17 @@ class Window(QMainWindow):
             self.views[name] = view
             labels = {"dns": "DNS", "http": "HTTP", "urls": "URLs", "apis": "APIs", "javascript": "JavaScript"}
             self.tabs.addTab(view, labels.get(name, name.title()))
-        self.views["doctor"].setPlainText(json.dumps(doctor(), indent=2))
+        self.views["doctor"].setPlainText("Checking local dependencies and tool versions…")
+        self.doctor_worker = LocalWorker(lambda: json.dumps(doctor(repo.home), indent=2))
+        self.doctor_worker.signals.done.connect(self.views["doctor"].setPlainText)
+        self.doctor_worker.signals.error.connect(self.views["doctor"].setPlainText)
+        QThreadPool.globalInstance().start(self.doctor_worker)
+        self.local_jobs = []
         self.views["settings"].setPlainText("Scan limits: 30 hosts, 30 pages per host, depth 2, 100 HTTP requests, 2 requests/second.\n\n"
             "Native requests verify TLS and pin DNS addresses. Private addresses need explicit IP scope.\n\n"
             "Host intelligence uses SHODAN_API_KEY or CENSYS_PLATFORM_TOKEN and optional CENSYS_ORGANIZATION_ID from the launch environment. "
             "Keys are not saved in the workspace. Provider queries may consume account credits.\n\n"
-            "Use Doctor to inspect available tools; PATH presence does not establish compatible versions.")
+            "Use Doctor to inspect bounded local version probes and compatibility families.")
         layout.addWidget(self.tabs)
         self.setCentralWidget(root)
         self.refresh_projects()
@@ -357,17 +376,25 @@ class Window(QMainWindow):
         self.status.setText("Reading existing " + provider + " host observations; no target scan initiated.")
         QThreadPool.globalInstance().start(self.worker)
 
+    def local_task(self, operation, done):
+        job = LocalWorker(operation)
+        self.local_jobs.append(job)
+        job.signals.done.connect(done)
+        job.signals.error.connect(self.status.setText)
+        # Bound simultaneous local work so repeated clicks cannot exhaust memory.
+        job.signals.done.connect(lambda _: self.local_jobs.remove(job))
+        job.signals.error.connect(lambda _: self.local_jobs.remove(job))
+        QThreadPool.globalInstance().start(job)
+
     def export(self):
         identifier = self.scans.currentData()
-        if identifier:
+        if identifier and not self.local_jobs:
             destination = QFileDialog.getExistingDirectory(self, "Export directory")
             if destination:
-                try:
-                    from .reporting import export_reports
-                    export_reports(self.repo, identifier, destination)
-                    self.status.setText("Exported to " + destination)
-                except (ValueError, OSError) as exc:
-                    QMessageBox.warning(self, "Export failed", str(exc))
+                from .reporting import export_reports
+                self.status.setText("Generating reports…")
+                self.local_task(lambda: export_reports(self.repo, identifier, destination),
+                                lambda path: self.status.setText("Exported to " + path))
 
     def compare(self):
         index = self.scans.currentIndex()
@@ -380,14 +407,12 @@ class Window(QMainWindow):
 
     def open_graph(self):
         identifier = self.scans.currentData()
-        if identifier:
+        if identifier and not self.local_jobs:
             from .graph import export_graph
-            destination = self.repo.home / "scans" / identifier / "graph.html"
-            try:
-                export_graph(self.repo.snapshot(identifier), destination)
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(destination)))
-            except (ValueError, OSError) as exc:
-                QMessageBox.warning(self, "Graph failed", str(exc))
+            destination = self.repo.managed_directory("scans", identifier) / "graph.html"
+            self.status.setText("Generating graph…")
+            self.local_task(lambda: export_graph(self.repo.snapshot(identifier), destination),
+                            lambda path: QDesktopServices.openUrl(QUrl.fromLocalFile(path)))
 
     def closeEvent(self, event):
         self.cancel.set()

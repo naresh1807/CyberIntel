@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+import queue
 import re
 import socket
 import ssl
@@ -11,6 +12,41 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit
 import httpx
 
 from cyberintel.models import ValidationError
+
+_resolution_slots = threading.BoundedSemaphore(4)
+
+
+def resolve_addresses(host, port, cancel=None, timeout=5):
+    """Bound libc resolution without growing an unbounded pool of stuck threads.
+
+    A timed-out libc call cannot be killed safely; at most four daemon calls can
+    remain in flight, and subsequent requests fail closed when capacity is full.
+    """
+    if not _resolution_slots.acquire(blocking=False):
+        raise ValidationError("DNS resolution concurrency limit reached.")
+    result = queue.Queue(maxsize=1)
+    def resolve():
+        try:
+            result.put((True, socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)))
+        except Exception as exc:
+            result.put((False, exc))
+        finally:
+            _resolution_slots.release()
+    threading.Thread(target=resolve, daemon=True).start()
+    deadline = time.monotonic() + timeout
+    while True:
+        if cancel and cancel.is_set():
+            raise ValidationError("Scan cancelled.")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("DNS resolution timed out.")
+        try:
+            successful, value = result.get(timeout=min(.05, remaining))
+        except queue.Empty:
+            continue
+        if not successful:
+            raise value
+        return value
 
 
 def tls_metadata(response):
@@ -100,7 +136,9 @@ class ScopedHTTP:
                     dns_host = host
                 except ValueError:
                     dns_host = host + "."
-                addresses = socket.getaddrinfo(dns_host, parts.port or (443 if parts.scheme == "https" else 80), type=socket.SOCK_STREAM)
+                addresses = resolve_addresses(dns_host, parts.port or (443 if parts.scheme == "https" else 80), self.cancel)
+                scope = self.scope_loader()
+                scope.require(url)
                 if not addresses:
                     raise ValidationError("No connection address found.")
                 for address in addresses:
@@ -125,7 +163,9 @@ class ScopedHTTP:
                             raise ValidationError("Redirect has no destination.")
                         destination = clean_url(response.headers.get("location", ""), url)
                         scope.require(destination)
-                        if (extra or query) and urlsplit(destination).hostname != parts.hostname:
+                        def origin(parsed):
+                            return parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
+                        if (extra or query) and origin(urlsplit(destination)) != origin(parts):
                             raise ValidationError("Provider credentials/parameters cannot follow cross-host redirects.")
                         if parts.scheme == "https" and urlsplit(destination).scheme != "https":
                             raise ValidationError("TLS downgrade redirect blocked.")
