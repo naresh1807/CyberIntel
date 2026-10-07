@@ -1,4 +1,8 @@
-# Kali and Parrot release qualification
+# Historical Kali and Parrot release qualification
+
+This document records the earlier revision-3 → revision-4 phase. Current
+revision-5 status and MIT licensing are in [production readiness](PRODUCTION_RELEASE_READINESS.md).
+Earlier PASS results do not qualify the current candidate or a desktop VM.
 
 Baseline: c90c680. This phase changes packaging and qualification checks, not
 the scanner architecture. CyberIntel, its entry point and its data remain intact.
@@ -185,7 +189,7 @@ Run the manual `Kali and Parrot release qualification` GitHub workflow to
 reproduce tests in digest-pinned official containers. It builds revision 3 from
 c90c680 and revision 4 from the checkout, then runs
 scripts/qualify_cyberrecon_release.py. JSON/log/report artifacts are uploaded
-even on failure. This workflow has been updated, not remotely executed here.
+even on failure. The workflow now builds revision 4 from a173634 and revision 5 from the checkout. It remains unexecuted remotely in this environment.
 The lifecycle script refuses package changes unless root and explicitly inside
 a disposable OS marked at /run/cyberrecon-disposable-root. Never mark a host
 production system. Source tests and installed tests are separate.
@@ -204,7 +208,7 @@ Test actual Kali/Parrot desktop VMs as normal users, including display/session
 libraries, launcher/menu behavior, real root package ownership, reboot,
 upgrade/purge and non-root scans. Offscreen startup cannot prove these.
 
-License and maintainer identity remain development placeholders. There is no
+At the time of this historical phase, license and maintainer identity were development placeholders. MIT has since been selected; maintainer identity remains unavailable. There is no
 hosted production APT repository or persistent release signing trust root.
 `sudo apt update; sudo apt install cyberrecon` without a local package path
 must not be advertised as available. Finalize these gates before public release.

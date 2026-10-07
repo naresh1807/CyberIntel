@@ -36,6 +36,15 @@ alone cannot create them. This follows GitHub's
 
 Repository variables: CYBERRECON_MAINTAINER (`Name <email>`), APT_PUBLIC_URL
 (actual HTTPS repository base), RELEASE_QUALIFIED_COMMIT (exact tested commit).
+Protected production-environment variable RELEASE_QUALIFICATION_JSON contains
+the reviewed evidence report for that commit (schema shown in
+release-evidence/final-production-gate.json). Every mandatory gate must be PASS
+with evidence, decision APPROVED, source_tree_dirty false and matching version/SHA.
+The checked-in report is NOT APPROVED; it cannot unlock publication. Set the
+reviewed report after committing/testing the candidate so no commit must embed
+its own hash. This is a human-reviewed attestation, not automatic proof of a VM.
+The preparation job also requires the protected production environment when
+publish=true; candidate preparation uses cyberrecon-candidate.
 Environment variable: APT_SIGNING_FINGERPRINT (full 40/64 hexadecimal fingerprint).
 Protected environment secrets: APT_SIGNING_PRIVATE_KEY (armored signing key
 export) and APT_SIGNING_PASSPHRASE. Never paste secrets into source, commands,
@@ -47,7 +56,8 @@ Preparation runs Python/Go tests, local TLS/Nmap verification, dependency audit,
 archive checks, builds, staging verification and SHA256 manifests. Publication
 requires identity, HTTPS URL and qualified SHA, then protected approval, signing,
 Pages deployment, remote HTTPS signature/content verification and a GitHub release
-with notes and artifacts. Workflow execution is NOT TESTED in this phase.
+with notes and artifacts under tag `v0.2.0`. Workflow execution is NOT TESTED in this phase.
+Do not create the production tag while any gate is blocked.
 Checksums detect transfer errors; signed metadata plus independent fingerprint
 verification establishes repository trust. Candidate checksums are not signatures.
 

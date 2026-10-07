@@ -1,8 +1,78 @@
+# CyberRecon v0.2.0 final release checklist
+
+Checked boxes apply only to the explicitly stated source/staging scope. Every
+VM installation item remains unchecked until actually executed. Production is
+NOT APPROVED; no v0.2.0 tag has been created.
+
+## Build
+
+- [x] Source tests pass (410; current working tree)
+- [x] Debian package builds (development candidate)
+- [x] Package contents validated (staging)
+- [x] SHA256 generated (development candidate)
+
+## Kali
+
+- [ ] Fresh install (installed desktop VM)
+- [ ] CLI (installed desktop VM)
+- [ ] Doctor (installed desktop VM)
+- [ ] GUI (installed desktop VM)
+- [ ] Launcher (installed desktop VM)
+- [ ] Non-root (installed desktop VM)
+- [ ] Upgrade (installed desktop VM)
+- [ ] Reboot (installed desktop VM)
+- [ ] Remove (installed desktop VM)
+- [ ] Purge (installed desktop VM)
+- [ ] Reinstall (installed desktop VM)
+
+## Parrot
+
+- [ ] Fresh install (installed desktop VM)
+- [ ] CLI (installed desktop VM)
+- [ ] Doctor (installed desktop VM)
+- [ ] GUI (installed desktop VM)
+- [ ] Launcher (installed desktop VM)
+- [ ] Non-root (installed desktop VM)
+- [ ] Upgrade (installed desktop VM)
+- [ ] Reboot (installed desktop VM)
+- [ ] Remove (installed desktop VM)
+- [ ] Purge (installed desktop VM)
+- [ ] Reinstall (installed desktop VM)
+
+## Security
+
+- [x] Scope enforcement (regressions)
+- [x] TLS (owned local target and regressions)
+- [x] subprocess security (regressions/AST checks)
+- [x] permissions (workspace/staging)
+- [x] API-key handling (regressions; live credentials not tested)
+- [x] package security (archive/ownership/mode checks)
+- [ ] Installed VM package security and clean lifecycle
+
+## Distribution
+
+- [ ] Production APT
+- [ ] HTTPS repository verification
+- [ ] Repository signing with production trust anchor
+- [ ] GitHub release / v0.2.0 tag
+- [x] checksums (development candidate)
+- [x] installation docs (explicitly gated)
+
+## Project
+
+- [x] LICENSE (MIT)
+- [ ] Maintainer metadata
+- [x] README (primary CyberRecon/legacy boundary)
+- [x] Responsible-use policy
+- [x] Known limitations
+
+
 # Release checklist and exact candidate commands
 
 No production sign-off until every required VM/identity/hosting gate is recorded
-against the exact commit. A reviewer must assess the evidence; setting a SHA
-variable is an attestation, not an automated proof of desktop testing.
+against the exact commit. A reviewer must assess the evidence. Production requires a matching reviewed
+RELEASE_QUALIFICATION_JSON with every gate PASS and decision APPROVED, not just
+a SHA variable. This remains an attestation, not automatic desktop proof.
 
 ## Clean candidate build
 
@@ -28,6 +98,7 @@ export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
 python3 scripts/build-cyberrecon-deb.py --worker dist/candidate/cyberrecon-dns --output dist/candidate
 .venv/bin/python scripts/verify_cyberrecon_package.py dist/candidate/cyberrecon_0.2.0-5_amd64.deb
 python3 scripts/check_release_security.py --artifacts dist/candidate
+.venv/bin/python scripts/prepare_cyberrecon_release.py --build-manifest dist/candidate
 python3 scripts/prepare_cyberrecon_release.py --checksums dist/candidate
 (cd dist/candidate && sha256sum -c SHA256SUMS)
 ```

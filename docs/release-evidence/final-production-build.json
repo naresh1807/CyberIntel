@@ -1,0 +1,93 @@
+{
+  "source_commit": "c1fafb83048872023cc19fd6326b74283d980121",
+  "source_tree_dirty": true,
+  "version": "0.2.0",
+  "package_version": "0.2.0-5",
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "410",
+    "time": "33.343",
+    "timestamp": "2026-10-07T06:11:06.393578-04:00",
+    "hostname": "kali"
+  },
+  "new_regression_cases": 6,
+  "package_sha256": "b37706082555a0ad97cfbb3ec6b76e4663845daff2ab8aed33798db450042b64",
+  "reproducibility": "PASS: two local Debian builds, same SOURCE_DATE_EPOCH; cross-host reproducibility NOT TESTED",
+  "development_apt": {
+    "signature": "PASS: InRelease and Release.gpg verified with gpgv",
+    "index_and_package_sha256": "PASS",
+    "gzip_equivalence": "PASS",
+    "architecture": "amd64"
+  },
+  "dependency_audit": "PASS: 47 packages, no known vulnerabilities; no dependency hashes/full OS/Go audit claimed",
+  "workflow_execution": "NOT TESTED",
+  "production_tag_created": false,
+  "release_decision": "NOT APPROVED",
+  "baseline_ci": {
+    "commit": "c1fafb83048872023cc19fd6326b74283d980121",
+    "workflow": "Tests",
+    "url": "https://github.com/naresh1807/CyberIntel/actions/runs/37604351659",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "linux (3.12)",
+        "conclusion": "success"
+      },
+      {
+        "name": "linux (3.13)",
+        "conclusion": "success"
+      },
+      {
+        "name": "linux (3.14)",
+        "conclusion": "success"
+      }
+    ],
+    "scope": "Baseline CI only; current working-tree release workflow NOT TESTED"
+  },
+  "go_race_tests": "PASS (cached)",
+  "source_ast_files": 96,
+  "live_kali_source_gui": {
+    "status": "PASS",
+    "uid": 1000,
+    "os_release": "PRETTY_NAME=\"Kali GNU/Linux Rolling\"\nNAME=\"Kali GNU/Linux\"\nVERSION_ID=\"2026.3\"\nVERSION=\"2026.3\"\nVERSION_CODENAME=kali-rolling\nID=kali\nID_LIKE=debian\nHOME_URL=\"https://www.kali.org/\"\nSUPPORT_URL=\"https://forums.kali.org/\"\nBUG_REPORT_URL=\"https://bugs.kali.org/\"\nANSI_COLOR=\"1;31\"\n",
+    "mode": "Source GUI, actual desktop; installed VM/reboot NOT TESTED",
+    "checks": {
+      "rendering-theme-icon": "PASS",
+      "tab-navigation": [
+        "dashboard",
+        "scope",
+        "assets",
+        "subdomains",
+        "dns",
+        "http",
+        "ports",
+        "services",
+        "technologies",
+        "urls",
+        "apis",
+        "javascript",
+        "historical",
+        "findings",
+        "relationships",
+        "errors",
+        "hosts",
+        "scan_history",
+        "comparison",
+        "settings",
+        "doctor"
+      ],
+      "table-scroll-filter-cap": "PASS",
+      "scope-error-displayed": "PASS",
+      "native-scan-cancellation": "PASS",
+      "report-graph-generation": "PASS; browser/menu handoff NOT TESTED",
+      "close-reopen-persistence": "PASS; reboot NOT TESTED"
+    },
+    "qt_platform": "xcb",
+    "sidebar": "NOT IMPLEMENTED: current navigation is tabs",
+    "large_refresh_seconds": 1.03,
+    "large_refresh": "MEASURED; synchronous population remains a limitation"
+  }
+}

@@ -14,6 +14,7 @@ concurrency:
 jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
+    environment: ${{ inputs.publish && 'cyberrecon-production' || 'cyberrecon-candidate' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -21,6 +22,7 @@ jobs:
       CYBERRECON_MAINTAINER: ${{ vars.CYBERRECON_MAINTAINER }}
       APT_PUBLIC_URL: ${{ vars.APT_PUBLIC_URL }}
       RELEASE_QUALIFIED_COMMIT: ${{ vars.RELEASE_QUALIFIED_COMMIT }}
+      RELEASE_QUALIFICATION_JSON: ${{ vars.RELEASE_QUALIFICATION_JSON }}
       PUBLISH: ${{ inputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -60,6 +62,7 @@ jobs:
           fi
           python scripts/verify_cyberrecon_package.py dist/release/cyberrecon_0.2.0-5_amd64.deb
           python scripts/check_release_security.py --artifacts dist/release
+          python scripts/prepare_cyberrecon_release.py --build-manifest dist/release
           python scripts/prepare_cyberrecon_release.py --checksums dist/release
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -138,4 +141,4 @@ jobs:
           (cd dist/release && sha256sum -c SHA256SUMS)
           tar -czf dist/cyberrecon-apt.tar.gz -C dist/release/apt .
           sha256sum dist/cyberrecon-apt.tar.gz > dist/apt-tar.SHA256SUMS
-          gh release create cyberrecon-v0.2.0-5 --target "$GITHUB_SHA" --title 'CyberRecon 0.2.0, Debian revision 5' --notes-file docs/RELEASE_NOTES.md dist/release/*.deb dist/release/*.whl dist/release/*.tar.gz dist/release/SHA256SUMS dist/cyberrecon-apt.tar.gz dist/apt-tar.SHA256SUMS
+          gh release create v0.2.0 --target "$GITHUB_SHA" --title 'CyberRecon v0.2.0' --notes-file docs/RELEASE_NOTES.md dist/release/*.deb dist/release/*.whl dist/release/*.tar.gz dist/release/SHA256SUMS dist/cyberrecon-apt.tar.gz dist/apt-tar.SHA256SUMS

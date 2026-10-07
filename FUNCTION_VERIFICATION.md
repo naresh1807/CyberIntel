@@ -92,3 +92,12 @@ See [production readiness](docs/PRODUCTION_RELEASE_READINESS.md),
 [release checklist](docs/RELEASE_CHECKLIST.md), [APT/signing operations](docs/APT_REPOSITORY.md),
 and [compatibility migration plan](docs/COMPATIBILITY_MIGRATION.md).
 Desktop VM, reboot and production publication gates remain blocked or untested.
+
+
+## Final v0.2.0 release gate
+
+Baseline c1fafb8 plus local final-gate changes: 410 tests passed, zero failures/skips/xfailed.
+Live Kali source GUI/CLI and owned TLS/Nmap checks passed. Installed Kali/Parrot
+desktop lifecycle, reboot and production distribution remain BLOCKED/NOT TESTED.
+See [final decision](docs/PRODUCTION_RELEASE_READINESS.md). Earlier Windows and
+revision-3/4 results are historical evidence for their own versions/environments.

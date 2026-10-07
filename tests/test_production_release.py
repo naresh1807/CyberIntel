@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 from pathlib import Path
 import subprocess
 import tarfile
@@ -74,10 +75,34 @@ def test_production_identity_gate_and_checksums(tmp_path):
     with pytest.raises(ValueError, match='exact commit'):
         prepare.production_gate(environment)
     environment['RELEASE_QUALIFIED_COMMIT'] = 'a' * 40
-    prepare.production_gate(environment)
+    qualification = {'decision': 'APPROVED', 'source_tree_dirty': False, 'commit': 'a' * 40,
+                     'version': '0.2.0', 'package_version': '0.2.0-5',
+                     'gates': {name: {'status': 'PASS', 'evidence': 'Synthetic unit fixture only'}
+                               for name in prepare.REQUIRED_GATES}}
+    prepare.production_gate(environment, qualification)
     (tmp_path / 'package').write_bytes(b'fixture')
     prepare.checksums(tmp_path)
     subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=tmp_path, check=True)
+    prepare.build_manifest(tmp_path)
+    manifest = json.loads((tmp_path / 'build-manifest.json').read_text())
+    assert len(manifest['source_commit']) == 40 and manifest['python']
+    assert manifest['artifact_sha256']['package'] in (tmp_path / 'SHA256SUMS').read_text()
+    assert manifest['dependency_versions'] and 'build-manifest.json' not in manifest['artifact_sha256']
+
+
+@pytest.mark.parametrize('gate', ['parrot_desktop', 'upgrade', 'reboot', 'signing', 'maintainer'])
+def test_production_gate_rejects_unqualified_release(gate):
+    prepare = module('prepare_cyberrecon_release')
+    environment = {'CYBERRECON_MAINTAINER': 'Unit fixture <fixture@example.test>',
+                   'APT_PUBLIC_URL': 'https://fixture.example.test/apt',
+                   'GITHUB_SHA': 'a' * 40, 'RELEASE_QUALIFIED_COMMIT': 'a' * 40}
+    qualification = {'decision': 'APPROVED', 'source_tree_dirty': False, 'commit': 'a' * 40,
+                     'version': '0.2.0', 'package_version': '0.2.0-5',
+                     'gates': {name: {'status': 'PASS', 'evidence': 'Synthetic fixture'}
+                               for name in prepare.REQUIRED_GATES}}
+    qualification['gates'][gate]['status'] = 'BLOCKED'
+    with pytest.raises(ValueError, match='Every mandatory'):
+        prepare.production_gate(environment, qualification)
 
 
 def test_deb_permissions_launcher_license_and_production_block(tmp_path):
@@ -130,3 +155,27 @@ def test_package_overlay_preserves_history_reports_and_permissions(tmp_path):
     assert reopened.snapshot(scan)['assets'][0]['host'] == '127.0.0.1'
     assert {p.name: p.read_bytes() for p in exported.iterdir()} == before
     assert reopened.path.stat().st_mode & 0o777 == 0o600
+
+
+def test_lifecycle_fingerprint_detects_report_and_scope_changes(tmp_path):
+    from cyberrecon.storage import Repository
+    from cyberrecon.reporting import export_reports
+    repo = Repository(tmp_path / 'home')
+    project = repo.create_project('Preservation fixture', ['127.0.0.1'], authority='Owned fixture')
+    scan = repo.start_scan(project, '127.0.0.1', {})
+    repo.save(scan, 'assets', '127.0.0.1', {'host': '127.0.0.1'}, 'Synthetic fixture')
+    repo.finish(scan, [])
+    directory = Path(export_reports(repo, scan, repo.home / 'reports/fixture'))
+    fingerprint = module('qualify_cyberrecon_release').workspace_fingerprint
+    original = fingerprint(repo.home)
+    assert {'scan.json', 'observations.csv', 'report.html', 'report.pdf', 'graph.html'} <= {
+        Path(name).name for name in original['reports']}
+    assert fingerprint(Repository(repo.home).home) == original
+    pdf = directory / 'report.pdf'
+    saved = pdf.read_bytes()
+    pdf.write_bytes(saved + b'changed')
+    assert fingerprint(repo.home) != original
+    pdf.write_bytes(saved)
+    assert fingerprint(repo.home) == original
+    repo.update_scope(project, ['127.0.0.1'], ['127.0.0.2'])
+    assert fingerprint(repo.home)['database_state_sha256'] != original['database_state_sha256']

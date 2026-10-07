@@ -16,6 +16,27 @@ import subprocess
 import sys
 
 
+def workspace_fingerprint(home):
+    """Hash logical SQLite state and every report, independent of WAL layout."""
+    home = Path(home)
+    database = home / 'cyberrecon.db'
+    if home.is_symlink() or database.is_symlink():
+        raise ValueError('Qualification workspace cannot be a symlink')
+    with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
+        if connection.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+            raise ValueError('Qualification database integrity failure')
+        schema = connection.execute('PRAGMA user_version').fetchone()[0]
+        dump = '\n'.join(connection.iterdump()).encode()
+    reports = {}
+    for path in sorted((home / 'reports').rglob('*')):
+        if path.is_symlink():
+            raise ValueError('Qualification reports cannot be symlinks')
+        if path.is_file():
+            reports[path.relative_to(home).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {'schema': schema, 'database_state_sha256': hashlib.sha256(dump).hexdigest(),
+            'reports': reports}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('previous')
@@ -62,6 +83,9 @@ def main():
         return log.read_text(errors='replace')
 
     preserved_reports = {}
+    preserved_lab = None
+    scripts = Path(__file__).resolve().parent
+    lab_home = out / 'lab-before-upgrade'
 
     def fixture():
         with sqlite3.connect(home / 'cyberrecon.db') as db:
@@ -76,6 +100,10 @@ def main():
         assert (home / 'preservation-marker.txt').read_text() == 'Keep user data\n'
         for name, digest in preserved_reports.items():
             assert hashlib.sha256((home / 'reports/fixture' / name).read_bytes()).hexdigest() == digest
+        if preserved_lab is not None:
+            assert workspace_fingerprint(lab_home) == preserved_lab, 'Pre-upgrade scan/report state changed'
+            assert lab_home.stat().st_mode & 0o777 == 0o700
+            assert (lab_home / 'cyberrecon.db').stat().st_mode & 0o777 == 0o600
 
     try:
         assert sys.version_info >= (3, 12), 'Python below supported minimum'
@@ -95,6 +123,16 @@ def main():
         preserved_reports.update({p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (home / 'reports/fixture').iterdir()})
         assert preserved_reports
         fixture()
+        previous_lab = json.loads(run('previous-installed-tls-nmap-reports',
+            [sys.executable, str(scripts / 'verify_cyberrecon_lab.py'), '--package', '--tls',
+             '--require-nmap', '--home', str(lab_home)], timeout=240))
+        assert previous_lab['status'] == 'complete' and previous_lab['real_nmap'] and previous_lab['tls_verified']
+        preserved_lab = workspace_fingerprint(lab_home)
+        assert {'scan.json', 'observations.csv', 'report.html', 'report.pdf', 'graph.html'} <= {
+            Path(name).name for name in preserved_lab['reports']}
+        report['pre_upgrade_lab'] = previous_lab
+        report['preserved_pre_upgrade_state'] = preserved_lab
+        fixture()
         run('upgrade', ['apt-get', '-o', 'APT::Sandbox::User=root', 'install', '-y', '--no-install-recommends', str(current)], timeout=900)
         assert run('installed-current', ['dpkg-query', '-W', '-f=${Status} ${Version}', 'cyberrecon']).strip() == 'install ok installed ' + new_version
         assert run('cli-version', ['cyberrecon', '--version']).strip() == new_version.split('-')[0]
@@ -106,7 +144,6 @@ def main():
         assert Path('/usr/bin/cyberrecon').stat().st_mode & 0o777 == 0o755
         assert not Path('/usr/bin/cyberrecon').stat().st_mode & 0o6000
         fixture()
-        scripts = Path(__file__).resolve().parent
         run('gui-startup', [sys.executable, str(scripts / 'verify_cyberrecon_startup.py'), '--package'])
         lab = json.loads(run('installed-tls-nmap-reports', [sys.executable, str(scripts / 'verify_cyberrecon_lab.py'), '--package', '--tls', '--require-nmap', '--home', str(out / 'lab')], timeout=240))
         assert lab['status'] == 'complete' and lab['real_nmap'] and lab['tls_verified'], lab

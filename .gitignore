@@ -13,4 +13,10 @@ reports/
 artifacts/
 *.pyc
 .env.*
-
+*.key
+*.pem
+*.p12
+*.pfx
+*.qcow2
+*.vdi
+*.iso

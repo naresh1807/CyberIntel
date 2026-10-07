@@ -1,78 +1,108 @@
-# Production release readiness
+# CyberRecon v0.2.0 production release readiness
 
-This phase prepares a candidate; it does not certify a public production release.
-Baseline: a1736341030de9f23b0ebcb913f40efafb2d59ee. Evidence was executed on
-Kali 2026.3, Python 3.14.7, as UID 1000. No system packages were installed,
-no host reboot was attempted, and no release was published.
+Audit baseline: `c1fafb83048872023cc19fd6326b74283d980121`. This phase includes uncommitted final-gate
+changes and does not qualify an immutable production commit. Runtime and Go
+protocol: **0.2.0**. Candidate Debian package: **cyberrecon 0.2.0-5**.
+Compatibility Python distribution/desktop: **cyberintel-suite / CyberIntel 0.1.0**,
+retained intentionally. Primary command/module: cyberrecon / python -m cyberrecon.
+No debian/ tree exists; scripts/build-cyberrecon-deb.py generates Debian metadata.
 
-## Verified identity and policy
+## Release blocker matrix
 
-CyberRecon and the Go protocol remain 0.2.0. The candidate Debian package is
-`cyberrecon 0.2.0-5` (all without the worker, amd64 with the built worker).
-The Python distribution remains `cyberintel-suite 0.1.0`; the independent legacy
-CyberIntel desktop remains 0.1.0. Entry points are `cyberrecon.cli:main` and
-`cyberintel.app:main`. Primary module: `python -m cyberrecon`.
-MIT was selected with the user's authorization. LICENSE, SPDX metadata, package
-copyright, GUI About and Debian metadata agree. Public maintainer name/email:
-**MAINTAINER IDENTITY REQUIRED**. No personal identity or hosting URL was invented.
-
-Minimum Python: 3.12. Recommended: the supported distribution's Python 3.13 or
-3.14. Current full suite: 3.14.7; prior distribution qualification also exercised
-Parrot's 3.13.5 subset. Python 3.12 is declared and covered by the existing CI
-matrix but was NOT TESTED locally in this phase. Below 3.12 is unsupported;
-future versions and operating-system releases require qualification. Kali 2026.3
-is the measured desktop; Parrot 7.1 has historical isolated package evidence,
-not current desktop certification. No blanket support for every rolling release.
-
-Dependencies are verified from pyproject, Debian metadata and Doctor rather
-than documentation alone. The source lock contains 47 measured Python 3.14
-packages; it is not a universal Debian or Python 3.12/3.13 lock. Doctor reports
-required Python minimums and optional tool requirements/actions. Nmap is
-recommended for port scans. External tools/providers remain capability-dependent.
-
-## Executed results and limits
-
-| Gate | Result | Evidence/limit |
+| Gate | Status | Evidence |
 | --- | --- | --- |
-| Initial full suite | PASS | 391 passed |
-| Final candidate suite | PASS | 404 passed; 34.94 seconds |
-| New production tests | PASS | Archive paths, secrets, package modes, identity, state/report preservation, Doctor; 13 new tests; 18 targeted tests including existing release checks |
-| Go race tests/build | PASS | Existing DNS worker; static amd64 worker built |
-| Python wheel/sdist | PASS | Isolated release-tool environment, pinned backend |
-| Dependency re-audit | PASS | 47 packages, no known vulnerabilities; tool/feed scope only |
-| Actual Kali desktop, source GUI | PASS | UID 1000, XFCE/X11, Qt xcb, screenshots and desktop.json |
-| GUI cancellation/error/table/export/reopen | PASS | Owned loopback job, 1100 synthetic assets, 1000-row cap |
-| TLS local target and real Nmap | PASS | Complete; 4 HTTP, 1 port, 2 APIs, 1 JavaScript record |
-| Debian staging and launcher | PASS | all/amd64 staging, ownership/modes/license/icon checks |
-| Development APT signatures | PASS | Both InRelease and detached Release.gpg checked with gpgv |
-| Clean Kali desktop VM | BLOCKED | No VM hypervisor or /dev/kvm available; live source GUI is not a clean installed VM |
-| Parrot desktop VM | BLOCKED | No Parrot desktop VM available |
-| Actual 4 → 5 APT/dpkg upgrade | NOT TESTED | Staged overlay preserves state/reports; not a real package transaction |
-| Actual revision-5 remove/purge | NOT TESTED | Staged removal check only; previous phase's 3 → 4 lifecycle is historical |
-| Reboot persistence/application menu | NOT TESTED | Do not reboot or alter the user's production desktop |
-| Public HTTPS APT/default install | BLOCKED | Hosting URL unavailable; no default distribution repository inclusion |
-| Production signing/workflow execution | BLOCKED | Operator identity, key, secrets and protected environments unavailable |
+| Full test suite | PASS | .venv/bin/python -m pytest -q --junitxml artifacts/final-production-gate/pytest.xml: 410 passed, 0 failed, 0 skipped, 0 xfailed (37.88 seconds); baseline 404 passed (36.63 seconds). |
+| Kali desktop | BLOCKED | Live Kali 2026.3 source GUI passed as UID1000 on XFCE/X11 Qt xcb; installed clean desktop VM is unavailable. No qemu-system-x86_64/virsh/VBoxManage or /dev/kvm; sudo -n true requires a password. Evidence: artifacts/final-production-gate/desktop/desktop.json. |
+| Parrot desktop | BLOCKED | No suitable Parrot Security amd64 desktop VM/environment available. Historical core-image package tests do not satisfy this gate. |
+| Fresh install | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Upgrade | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Reboot persistence | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Remove | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Purge | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Reinstall | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| GUI launcher | BLOCKED | No disposable desktop VM with package-management privilege. Production host is not modified or rebooted. Staged archive extraction is not an installed package transaction/menu test. |
+| Non-root CLI | PASS | .venv/bin/cyberrecon --version (0.2.0), --help and --doctor executed as UID1000; source CLI only. Installed non-root CLI remains part of VM gates. |
+| Scope enforcement | PASS | Full suite covers include/exclude, wildcard/apex, IPv4/IPv6 CIDR, private IP authorization, DNS exclusions and scope-before-transport. |
+| APT repository | BLOCKED | Production HTTPS repository and default-APT public installation unavailable. Development repository signatures/checksums are historical local evidence only. |
+| Repository signing | BLOCKED | No operator-managed production key, independently verified fingerprint or protected signing credentials available. No private key generated/committed for production. |
+| License | PASS | LICENSE is MIT; pyproject SPDX expression, Debian copyright, README and GUI About agree; compatibility distribution remains0.1.0 by design. |
+| Maintainer metadata | BLOCKED | RELEASE BLOCKER: Maintainer identity required before production publication. User previously confirmed public name/email unavailable; no fabricated identity. |
+| Release workflow | NOT TESTED | Workflow YAML/action pins inspected and local release gates tested. GitHub workflow execution/protected-environment configuration not verified; production v0.2.0 tag is not created. |
 
-Current navigation is tabs, not a sidebar. Dashboard, settings and Doctor use
-text/JSON panels; rich graph/report pages are not implemented. Graph/report files
-were generated, but external browser and installed menu handoff were NOT TESTED.
-Large-table refresh measured 0.698 seconds and is synchronous; do not claim a
-freeze-free interface. Source close/reopen persisted state; reboot did not run.
-Credential providers, broad external targets and every third-party tool are not
-certified by the owned local scan. Supply-chain checks are bounded heuristics,
-not a complete security audit. The feed initially returned duplicate records for
-one pip advisory; virtual-environment pip was upgraded from 26.1.2 to 26.2 and
-re-audited successfully. System Python/pip were not changed.
+## Supported policy and measured environment
 
-Evidence paths (ignored build artifacts): `artifacts/production-release/`,
-`artifacts/desktop-production-final/desktop.json`, dashboard.png/assets.png,
-`dist/production-preparation/`. Historical evidence remains in
-[RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
+Primary OS targets: Kali Linux and Parrot Security, initially amd64 only. No
+blanket rolling-release or Security-desktop certification is claimed. Current
+execution: Kali 2026.3, kernel7.1.5+kali-amd64, Python3.14.7, UID1000, XFCE/X11,
+DISPLAY=:0.0, Qt xcb. Minimum Python3.12; recommended distro Python3.13/3.14.
+Current full suite ran on3.14.7; historical Parrot core subset ran on3.13.5.
+Python3.12 remains a declared CI target, NOT TESTED locally. Below3.12 is
+unsupported; future Python/OS versions require qualification. Do not replace
+system Python. Source Python3.14 constraints are not a universal Debian lock.
 
-## Release decision
+The live source GUI passed rendering/icon/tab navigation, scope error handling,
+1000-row cap/filtering, cancellation, report/graph generation and close/reopen
+persistence with1100 synthetic assets. Latest synchronous refresh:1.03seconds.
+Settings, Dashboard and Doctor are text/JSON panels; sidebar is NOT IMPLEMENTED.
+Installed menu/browser report handoff and reboot are NOT TESTED. A benign Qt
+accessibility warning appeared; no unhandled traceback was reported by the GUI
+verifier. Window-only screenshots and JSON are under artifacts/final-production-gate/desktop.
 
-Candidate only: Debian revision 0.2.0-5. Do not tag it production until the exact
-commit passes the [release checklist](RELEASE_CHECKLIST.md). Recommended next
-application version is 0.2.1 after those gates, with an intentional coordinated
-version change; this packaging phase does not arbitrarily bump runtime versions.
-CyberIntel removal is not authorized; see [migration plan](COMPATIBILITY_MIGRATION.md).
+## Security and preservation evidence
+
+Scope, TLS, redirects, request/response bounds, parameter-value redaction,
+subprocess bounds, workspace/database permissions and provider/API-key protection
+passed existing regressions. Neither optional provider integration nor broad
+external recon coverage is certified. No third-party active target was scanned.
+Package staging tests are independent of actual APT install/upgrade/remove/purge.
+The disposable lifecycle harness now scans its owned TLS target using the old
+installed package before upgrading, hashes logical database state and every
+JSON/CSV/HTML/PDF/graph report, and compares these after upgrade/remove/purge/
+reinstall. Mutation-detection regression passes; the real revised harness remains
+NOT TESTED because a privileged disposable OS is unavailable. It refuses changes
+on unmarked hosts. No current system package installation/removal was attempted.
+
+MIT is preserved. Maintainer identity, hosting and operator signing key remain
+unavailable, as already stated by the user. No fake name/email, private production
+key or public hosting endpoint was created. [Signing/rotation/recovery](APT_REPOSITORY.md)
+and [compatibility migration](COMPATIBILITY_MIGRATION.md) remain documented.
+
+## Workflow and reproducibility
+
+Production publication is manual, main-only and protected by environment review;
+Actions are pinned, credentials are not persisted and job permissions are scoped.
+The gate now requires a reviewed report with APPROVED, matching commit/version,
+a clean source tree and PASS/evidence for every mandatory gate, in addition to
+identity, HTTPS URL and qualified SHA. Checked-in evidence is NOT APPROVED.
+RELEASE_QUALIFICATION_JSON is supplied after committing/testing through protected
+production environment variables; this avoids embedding a commit's own hash in
+that commit. An attestation is not automatic VM proof. Configure required reviewers
+and inspect evidence before enabling publication. Workflow execution remains
+NOT TESTED. Only after all gates pass does publication create tag **v0.2.0**.
+
+Build manifests record source commit/dirty state, UTC build date, SOURCE_DATE_EPOCH,
+Python/OS/architecture, installed build dependency versions, Debian dependency
+metadata and artifact SHA256. SHA256SUMS covers the manifest and artifacts.
+Fresh checkout reproducibility is preferred; a local working-tree candidate is
+not the final immutable release. See the [exact build/VM commands](RELEASE_CHECKLIST.md).
+Prior development-signing and dependency-audit results are in the historical
+[preparation evidence](release-evidence/production-readiness.json); they cannot
+be silently promoted into current production PASS. Final phase artifact/checksum
+results are recorded in release-evidence/final-production-build.json.
+
+## Exact remaining actions
+
+1. Commit/review this candidate, then qualify that immutable commit on disposable
+Kali and Parrot Security amd64 desktop VMs with default APT behavior, normal-user
+CLI/Doctor/GUI/menu, old→new data/report preservation, reboot, remove, purge and
+reinstall. Preserve OS/session, package hashes and logs. Do not reboot this host.
+2. Supply a real public maintainer name/email, provision HTTPS APT hosting and an
+operator-managed signing key through protected secrets; independently distribute
+its public fingerprint and execute the trust/rotation/recovery checks.
+3. Run the candidate GitHub workflow, review every mandatory gate and exact-commit
+artifact, populate protected qualification evidence, then approve production
+publication. No tag or public release is authorized by incomplete evidence.
+
+CYBERRECON v0.2.0 PRODUCTION RELEASE DECISION
+
+**NOT APPROVED**

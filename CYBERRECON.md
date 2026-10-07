@@ -43,7 +43,7 @@ OpenAPI/Swagger response parsing extracts bounded endpoint/method/parameter/secu
 ```sh
 python scripts/build-cyberrecon-deb.py
 python scripts/build-cyberrecon-deb.py --worker dist/cyberrecon-dns
-python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-4_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
+python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-5_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
 ```
 
 Without a Go worker the package architecture is `all`; with a worker it is the build host's architecture. Build the Go binary for that architecture. Dependencies use distribution packages and Python 3.12+, with no automatic pip installation in maintainer scripts. The removal/upgrade hook uses Debian `py3clean -p cyberrecon` to clean package bytecode; it never touches user workspaces. The launcher works independently of the current directory. Standard installation/update/uninstall is `sudo apt install ./cyberrecon_VERSION_ARCH.deb` / `sudo apt remove cyberrecon`; user-owned workspaces are preserved.
@@ -54,7 +54,7 @@ APT metadata expires after seven days and must be regenerated and re-signed for 
 
 `python scripts/verify_cyberrecon_lab.py --tls` starts an ephemeral loopback TLS service, verifies native discovery/certificate metadata, scans that script-owned port with real Nmap when available, and generates reports under ignored `artifacts/`. Its temporary certificate key is discarded. No external targets are contacted. CI runs the Go race tests and this local TLS/Nmap check.
 
-See [release qualification](docs/RELEASE_QUALIFICATION.md) for measured Kali/Parrot package lifecycle checks and exact image digests. These checks do not certify a graphical desktop VM or a production APT repository. Operator identity, project license and public hosting must be finalized before redistribution.
+See [release qualification](docs/RELEASE_QUALIFICATION.md) for measured Kali/Parrot package lifecycle checks and exact image digests. These checks do not certify a graphical desktop VM or a production APT repository. MIT is selected. Operator identity and public hosting remain release blockers.
 
 The clean-image path qualified locally uses `--no-install-recommends` for APT
 dependency resolution. Default recommendations pull additional system packages
@@ -87,7 +87,7 @@ After stopping all scan processes for a project, recover hard-interrupted scans:
 cyberrecon recover PROJECT_ID
 cyberrecon --doctor --doctor-wordlist ./paths.txt
 python scripts/verify_cyberrecon_startup.py
-python scripts/verify_cyberrecon_package.py dist/release-qualification/current/cyberrecon_0.2.0-4_all.deb
+python scripts/verify_cyberrecon_package.py dist/cyberrecon_0.2.0-5_all.deb
 python scripts/profile_cyberrecon.py
 ```
 
