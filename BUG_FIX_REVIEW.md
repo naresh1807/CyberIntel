@@ -98,3 +98,11 @@ development APT signing passed. Coverage percentage is unavailable. Actual clean
 Kali/Parrot install/upgrade/remove and a graphical desktop session remain untested;
 the added manually triggered distribution workflow is prepared but not executed.
 These changes do not constitute production certification or hosted APT publication.
+
+## Direct desktop scan setup
+
+Removed the separate New project dialog. The scan form now accepts a target,
+optional allowed/excluded scope and an authorization reference. Blank scope
+defaults to the exact target; automatic internal contexts preserve scan history
+and comparison. Invalid/excluded targets or missing authorization create no
+context or active operation. CLI project commands remain compatible.

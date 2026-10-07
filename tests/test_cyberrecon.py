@@ -115,7 +115,7 @@ def test_gui_browses_workspace(tmp_path, monkeypatch):
     repo = Repository(tmp_path)
     repo.create_project("Lab", ["example.org"], authority="Test")
     window = Window(repo)
-    assert window.projects.count() == 1
+    assert window.projects.count() == 2
     assert "example.org" in window.views["scope"].toPlainText()
     window.close()
     app.processEvents()

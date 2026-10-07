@@ -23,7 +23,7 @@ def main():
         repo.create_project('Startup fixture', ['127.0.0.1'], authority='Own local synthetic fixture')
         window = Window(repo)
         window.show()
-        assert window.projects.count() == 1
+        assert window.projects.count() == 2
         assert all(name in window.views for name in ('scope', 'assets', 'dns', 'ports', 'services', 'technologies', 'apis', 'errors', 'doctor'))
         QTimer.singleShot(200, app.quit)
         assert app.exec() == 0

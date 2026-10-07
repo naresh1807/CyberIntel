@@ -139,14 +139,23 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.projects = QComboBox()
         self.projects.currentIndexChanged.connect(self.refresh_scans)
+        row.addWidget(QLabel("Saved scopes / history"))
         row.addWidget(self.projects, 1)
-        create = QPushButton("New project")
-        create.clicked.connect(self.create_project)
-        row.addWidget(create)
         edit_scope = QPushButton("Edit scope")
         edit_scope.clicked.connect(self.edit_scope)
         row.addWidget(edit_scope)
         layout.addLayout(row)
+        scope_form = QFormLayout()
+        self.includes = QLineEdit()
+        self.includes.setPlaceholderText("Blank = exact target only; optional comma-separated domains, wildcards or IPs")
+        self.excludes = QLineEdit()
+        self.excludes.setPlaceholderText("Optional comma-separated exclusions")
+        self.authority = QLineEdit()
+        self.authority.setPlaceholderText("My own system or authorization/program reference")
+        scope_form.addRow("Allowed scope", self.includes)
+        scope_form.addRow("Exclude", self.excludes)
+        scope_form.addRow("Authorization", self.authority)
+        layout.addLayout(scope_form)
         options = QHBoxLayout()
         options.addWidget(QLabel("Passive discovery"))
         self.passive = QComboBox()
@@ -192,7 +201,7 @@ class Window(QMainWindow):
         stop.clicked.connect(self.cancel_scan)
         row.addWidget(stop)
         layout.addLayout(row)
-        self.status = QLabel("Create a project with an authorization reference before scanning.")
+        self.status = QLabel("Enter a target and authorization reference, then start scanning.")
         layout.addWidget(self.status)
         row = QHBoxLayout()
         self.scans = QComboBox()
@@ -234,26 +243,35 @@ class Window(QMainWindow):
         self.setCentralWidget(root)
         self.refresh_projects()
 
-    def refresh_projects(self):
+    def refresh_projects(self, preferred=None):
         self.projects.blockSignals(True)
         self.projects.clear()
         for item in self.repo.projects():
             self.projects.addItem(item["name"], item["id"])
+        self.projects.addItem("New scan", None)
+        if preferred:
+            self.projects.setCurrentIndex(self.projects.findData(preferred))
         self.projects.blockSignals(False)
         self.refresh_scans()
-        if self.projects.count():
-            self.status.setText("Project ready. Review Scope, enter an authorized target, then start a bounded scan.")
 
     def refresh_scans(self):
         self.scans.blockSignals(True)
         self.scans.clear()
         project = self.projects.currentData()
         if project:
+            scope = self.repo.scope(project)
+            self.includes.setText(", ".join(scope.include))
+            self.excludes.setText(", ".join(scope.exclude))
+            self.authority.setText(self.repo.project(project)["authority"])
             self.views["scope"].setPlainText(json.dumps(self.repo.scope(project).to_dict(), indent=2))
             for item in self.repo.scans(project):
                 self.scans.addItem(item["started_at"] + " • " + item["status"] + " • " + item["target"], item["id"])
             self.views["scan_history"].setPlainText(json.dumps(self.repo.scans(project)))
         else:
+            self.includes.clear()
+            self.excludes.clear()
+            self.authority.clear()
+            self.views["scope"].clear()
             self.views["scan_history"].clear()
         self.scans.blockSignals(False)
         self.show_scan()
@@ -271,32 +289,27 @@ class Window(QMainWindow):
         self.views["dashboard"].setPlainText(json.dumps({"scan": snapshot["scan"],
             "counts": {kind: len(snapshot[kind]) for kind in KINDS}}, indent=2))
 
-    def create_project(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Authorized project")
-        form = QFormLayout(dialog)
-        fields = [QLineEdit() for _ in range(4)]
-        for label, field in zip(("Name", "Include rules (comma separated)", "Exclude rules (comma separated)", "Authorization reference"), fields):
-            form.addRow(label, field)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        form.addRow(buttons)
-        if dialog.exec() == QDialog.Accepted:
-            try:
-                name, includes, excludes, authority = [field.text() for field in fields]
-                split = lambda text: [value.strip() for value in text.split(",") if value.strip()]
-                self.repo.create_project(name, split(includes), split(excludes), authority)
-                self.refresh_projects()
-            except ValueError as exc:
-                QMessageBox.warning(self, "Invalid project", str(exc))
+    def scan_context(self):
+        """Create/reuse the internal history context directly from scan inputs."""
+        from .scope import Scope, host_of
+        target = self.target.text()
+        split = lambda text: [value.strip() for value in text.split(",") if value.strip()]
+        scope = Scope(tuple(split(self.includes.text()) or [host_of(target)]), tuple(split(self.excludes.text())))
+        host = scope.require(target, passive=True)
+        authority = self.authority.text().strip()
+        if not authority:
+            raise ValueError("Enter an authorization reference, such as My own system or the program scope URL.")
+        for project in self.repo.projects():
+            if project["authority"] == authority and json.loads(project["scope"]) == scope.to_dict():
+                identifier = project["id"]
+                break
+        else:
+            identifier = self.repo.create_project(host, scope.include, scope.exclude, authority)
+        self.refresh_projects(identifier)
+        return identifier
 
     def start_scan(self):
         if self.worker:
-            return
-        project = self.projects.currentData()
-        if not project:
-            QMessageBox.warning(self, "Project required", "Create an authorized project first.")
             return
         self.cancel.clear()
         settings = {"crawl": self.crawl.isChecked(), "passive": self.passive.currentText() if self.passive.currentIndex() else None,
@@ -314,6 +327,11 @@ class Window(QMainWindow):
             except (ValueError, OSError) as exc:
                 QMessageBox.warning(self, "Wordlist failed", str(exc))
                 return
+        try:
+            project = self.scan_context()
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, "Check scan scope", str(exc))
+            return
         self.worker = Worker(self.repo, project, self.target.text(), settings, self.cancel)
         self.worker.signals.done.connect(self.finished)
         self.worker.signals.error.connect(self.finished)
@@ -362,14 +380,19 @@ class Window(QMainWindow):
             self.status.setText("Cancellation requested; waiting for the current bounded operation to stop.")
 
     def host_intelligence(self):
-        if self.worker or not self.projects.currentData():
+        if self.worker:
             return
         provider, accepted = QInputDialog.getItem(self, "Host intelligence", "Read existing observations for the entered authorized public IP (may consume account credits):",
                                                  ["shodan", "censys"], 0, False)
         if not accepted:
             return
+        try:
+            project = self.scan_context()
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, "Check scan scope", str(exc))
+            return
         self.cancel.clear()
-        self.worker = ProviderWorker(self.repo, self.projects.currentData(), self.target.text(), provider, self.cancel)
+        self.worker = ProviderWorker(self.repo, project, self.target.text(), provider, self.cancel)
         self.worker.signals.done.connect(self.finished)
         self.worker.signals.error.connect(self.finished)
         self.start.setEnabled(False)
