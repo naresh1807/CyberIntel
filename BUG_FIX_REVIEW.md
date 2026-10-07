@@ -106,3 +106,17 @@ optional allowed/excluded scope and an authorization reference. Blank scope
 defaults to the exact target; automatic internal contexts preserve scan history
 and comparison. Invalid/excluded targets or missing authorization create no
 context or active operation. CLI project commands remain compatible.
+
+## Architecture and production follow-up
+
+[Architecture audit](docs/ARCHITECTURE_AUDIT.md) verifies CyberRecon as the recon
+entry point and CyberIntel as both a compatibility application and a required
+shared dependency. Neither desktop, data store nor legacy entry point was removed.
+
+Fixed canonical URL aliases/IDNs/IPs/default ports, port-zero/DEL validation,
+malformed advisory/CPE isolation, advisory CVSS evidence, Doctor paths/minimums
+and basic DB safety checks, and missing Nmap service->technology graph edges.
+Added `python -m cyberrecon`; Debian revision is now 0.2.0-3. Validation: 386 Python
+tests passed, no failures/skips, offscreen GUI, CLI/Doctor, loopback TLS/Nmap,
+reports and package staging passed. Fresh Kali/Parrot apt and desktop lifecycle
+remain untested; environment overlay mounts failed and no host apt changes occurred.

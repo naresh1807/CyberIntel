@@ -227,3 +227,15 @@ environment. No third-party active targets were contacted.
 Next phase: execute supported-distribution release qualification, resolve any
 actual dependency/GUI/lifecycle failures, then finalize license/maintainer and
 operator-managed signed repository before public production claims.
+
+## Architecture follow-up against c1d08eb
+
+See [ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md) for dependency boundaries,
+source-verified stage status and seven additional verified findings (0 CRITICAL,
+0 HIGH, 3 MEDIUM, 4 LOW), now fixed and regression-tested. Current validation:
+386 Python tests passed, 0 failed/skipped; offscreen GUI, primary module entry,
+Doctor, loopback TLS/real Nmap/reports and Debian 0.2.0-3 staging passed. Existing
+partial DNS snapshot and large GUI refresh limitations remain. Clean distro apt
+lifecycle/desktop qualification is still unvalidated; an isolated overlay mount
+attempt failed, and no host package configuration was changed. Earlier test
+counts and package revisions above are historical results of the preceding audit.

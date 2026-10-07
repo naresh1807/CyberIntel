@@ -43,7 +43,7 @@ OpenAPI/Swagger response parsing extracts bounded endpoint/method/parameter/secu
 ```sh
 python scripts/build-cyberrecon-deb.py
 python scripts/build-cyberrecon-deb.py --worker dist/cyberrecon-dns
-python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-2_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
+python scripts/build-cyberrecon-apt.py dist/cyberrecon_0.2.0-3_amd64.deb --output dist/apt --sign-key OPERATOR_SIGNING_KEY_FINGERPRINT
 ```
 
 Without a Go worker the package architecture is `all`; with a worker it is the build host's architecture. Build the Go binary for that architecture. Dependencies use distribution packages and Python 3.12+, with no automatic pip installation in maintainer scripts. The launcher works independently of the current directory. Standard installation/update/uninstall is `sudo apt install ./cyberrecon_VERSION_ARCH.deb` / `sudo apt remove cyberrecon`; user-owned workspaces are preserved.
@@ -82,7 +82,7 @@ After stopping all scan processes for a project, recover hard-interrupted scans:
 cyberrecon recover PROJECT_ID
 cyberrecon --doctor --doctor-wordlist ./paths.txt
 python scripts/verify_cyberrecon_startup.py
-python scripts/verify_cyberrecon_package.py dist/audit/cyberrecon_0.2.0-2_all.deb
+python scripts/verify_cyberrecon_package.py dist/audit/cyberrecon_0.2.0-3_all.deb
 python scripts/profile_cyberrecon.py
 ```
 
@@ -102,3 +102,22 @@ containers. It has not been executed in this workspace. Desktop/session and
 privilege behavior still require supported-OS VM testing before a public release.
 Do not configure unsigned repositories or use `curl | bash`. Public
 `apt install cyberrecon` remains unavailable until a signed repository is hosted.
+
+## Architecture follow-up
+
+[Architecture audit](docs/ARCHITECTURE_AUDIT.md) records the primary CyberRecon
+pipeline and the required shared CyberIntel dependency; the compatibility GUI,
+launcher and its independent database remain intact. `python -m cyberrecon` is
+the primary module entry point. Debian revision 0.2.0-3 includes these fixes.
+New URL observations normalize IDNs, trailing dots, IP spellings and default
+ports; stored historical keys are retained, so comparisons across this update
+may reflect collector normalization changes rather than asset removal. Nmap
+service technologies are now connected to the directed graph.
+
+Doctor includes executable paths/minimum versions and read-only basic database
+path/header checks. HEADER_VALID is not an integrity check or schema migration
+verification. Missing optional tools are still reported without installation.
+NVD processing isolates malformed entries and retains bounded advisory CVSS
+evidence; scores do not establish target applicability or override backport
+uncertainty. Paid providers and external-engine compatibility still require
+separate qualification.

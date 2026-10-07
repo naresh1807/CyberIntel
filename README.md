@@ -1,8 +1,10 @@
-# CyberIntel Suite
+# CyberRecon
 
 The new **CyberRecon** entry point implements an bounded reconnaissance workflow with incremental security hardening. See [CyberRecon usage and implementation status](CYBERRECON.md). Run `.venv/bin/python -m cyberrecon.cli --help` or launch the desktop with `.venv/bin/python -m cyberrecon.cli`.
 
 The verified audit, fixes, test results and release limits are in [docs/AUDIT.md](docs/AUDIT.md). CyberRecon requires an explicit project authorization reference and enforces include/exclude scope before active requests. Run `.venv/bin/cyberrecon --doctor` for bounded local tool/version/dependency checks.
+
+[Architecture and compatibility boundaries](docs/ARCHITECTURE_AUDIT.md) explain the required CyberIntel shared modules and separate legacy desktop. CyberRecon is the primary recon entry point; `python -m cyberrecon` also launches it.
 
 For step-by-step instructions, see the [User Manual](USER_MANUAL.md).
 

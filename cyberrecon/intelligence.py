@@ -1,5 +1,6 @@
 """Optional release lifecycle enrichment; never confirms vulnerabilities."""
 import json
+import math
 import re
 
 from cyberintel.models import utcnow
@@ -11,9 +12,11 @@ PRODUCTS = {"nginx": "nginx", "apache": "apache-http-server", "php": "php", "mys
 
 
 def identify(record):
-    product, version = record.get("product", "").lower(), record.get("version", "")
+    product, version = record.get("product", ""), record.get("version", "")
+    product = product.lower() if isinstance(product, str) else ""
+    version = version if isinstance(version, str) else ""
     if not product:
-        match = re.match(r"^([a-zA-Z0-9_.-]+)/([0-9]+(?:\.[0-9]+){1,3})(?:\b|$)", record.get("banner", ""))
+        match = re.match(r"^([a-zA-Z0-9_.-]+)/([0-9]+(?:\.[0-9]+){1,3})(?:\b|$)", record.get("banner", "") if isinstance(record.get("banner", ""), str) else "")
         if match:
             product, version = match.group(1).lower(), match.group(2)
     return PRODUCTS.get(product), version
@@ -68,6 +71,8 @@ def enrich(repository, scan, transport=None, cancel=None):
 
 def normalized_cpe(value):
     """Conservative subset; ambiguous/escaped versions remain unknown."""
+    if not isinstance(value, str):
+        return None
     if value.startswith("cpe:/"):
         fields = value[5:].split(":")
         if len(fields) != 4:
@@ -83,12 +88,37 @@ def normalized_cpe(value):
     return value
 
 
+def advisory_cvss(cve):
+    """Retain bounded provider scores as advisory evidence, not target severity."""
+    result = []
+    metrics = cve.get("metrics", {})
+    if not isinstance(metrics, dict):
+        return result
+    for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
+        rows = metrics.get(key, [])
+        for row in (rows if isinstance(rows, list) else [])[:10]:
+            if not isinstance(row, dict) or not isinstance(row.get("cvssData"), dict):
+                continue
+            data = row["cvssData"]
+            score, vector = data.get("baseScore"), data.get("vectorString")
+            if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 10:
+                continue
+            if not isinstance(vector, str) or len(vector) > 512 or any(ord(char) < 32 for char in vector):
+                continue
+            result.append({"version": str(data.get("version", "unknown"))[:10], "base_score": score,
+                           "vector": vector, "source": str(row.get("source", "unknown"))[:200],
+                           "type": row.get("type") if row.get("type") in {"Primary", "Secondary"} else "unknown",
+                           "meaning": "Provider advisory severity; target applicability is unverified."})
+    return result[:10]
+
+
 def enrich_cves(repository, scan, transport=None, cancel=None):
     client = ScopedHTTP(lambda: Scope(("services.nvd.nist.gov",)), max_requests=3,
                         transport=transport, cancel=cancel)
     candidates = {}
     for record in repository.snapshot(scan)["technologies"]:
-        for value in record.get("cpe", []):
+        values = record.get("cpe", [])
+        for value in values if isinstance(values, (list, tuple)) else []:
             cpe = normalized_cpe(value)
             if cpe:
                 candidates.setdefault(cpe, []).append(record["key"])
@@ -113,22 +143,33 @@ def enrich_cves(repository, scan, transport=None, cancel=None):
             payload = json.loads(response["text"])
             if not isinstance(payload, dict) or not isinstance(payload.get("vulnerabilities"), list):
                 raise ValueError("Malformed NVD response.")
-            if payload.get("totalResults", 0) > 50:
+            total = payload.get("totalResults", 0)
+            if isinstance(total, int) and not isinstance(total, bool) and total > 50:
                 warnings.append("NVD coverage truncated to 50 candidates for " + cpe)
+            elif not isinstance(total, int) or isinstance(total, bool) or total < 0:
+                warnings.append("NVD returned invalid result-count metadata; available candidate entries were still checked.")
+            malformed = 0
             for entry in payload["vulnerabilities"][:50]:
-                cve = entry["cve"]
-                identifier = cve["id"]
-                if not re.fullmatch(r"CVE-\d{4}-\d{4,}", identifier) or cve.get("vulnStatus") == "Rejected":
+                cve = entry.get("cve") if isinstance(entry, dict) else None
+                identifier = cve.get("id") if isinstance(cve, dict) else None
+                if not isinstance(identifier, str) or not re.fullmatch(r"CVE-\d{4}-\d{4,}", identifier):
+                    malformed += 1
                     continue
-                description = next((item["value"][:1500] for item in cve.get("descriptions", []) if item.get("lang") == "en"), "")
+                if cve.get("vulnStatus") == "Rejected":
+                    continue
+                descriptions = cve.get("descriptions", [])
+                description = next((item["value"][:1500] for item in descriptions if isinstance(item, dict)
+                                    and item.get("lang") == "en" and isinstance(item.get("value"), str)), "") if isinstance(descriptions, list) else ""
                 repository.save(scan, "findings", identifier + ":" + cpe, {
-                    "cve_id": identifier, "description": description, "matched_cpe": cpe, "technology_keys": assets,
+                    "cve_id": identifier, "description": description, "matched_cpe": cpe, "advisory_cvss": advisory_cvss(cve), "technology_keys": assets,
                     "classification": "CVE candidate", "risk_status": "POTENTIALLY_AFFECTED", "confirmed_vulnerability": False,
                     "published": cve.get("published"), "intel_last_modified": cve.get("lastModified"),
                     "reference": "https://nvd.nist.gov/vuln/detail/" + identifier,
                     "reason": "NVD associated an observed versioned CPE with this advisory; installed package and applicability are unverified.",
                     "next_step": "Verify vendor advisory, installed package, configuration, affected ranges and distribution backports."},
                     "NVD CVE API 2.0", confidence="candidate-requires-validation")
+            if malformed:
+                warnings.append(f"NVD skipped {malformed} malformed advisory entries; valid candidates were retained.")
         except Exception as exc:
             warnings.append("NVD: " + type(exc).__name__ + "; provider lookup failed.")
     if not candidates:

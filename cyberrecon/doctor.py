@@ -43,14 +43,15 @@ def tool_status(name, capability):
         executable = worker_path()
     flags, minimum, upper = PROBES[name]
     supported = f">={'.'.join(map(str, minimum))}, <{upper}.0 (CLI family only)" if minimum else "version not detectable"
-    result = {"on_path": on_path, "installed": bool(executable), "version": None,
+    result = {"on_path": on_path, "installed": bool(executable), "path": str(Path(executable).absolute()) if executable else None,
+              "version": None, "minimum_supported_version": ".".join(map(str, minimum)) if minimum else None,
               "supported_version": supported, "compatibility": "unknown", "status": "OPTIONAL",
               "capability": capability, "recommended_action": "Install only if this optional capability is needed."}
     if not executable:
         for directory in os.get_exec_path():
             candidate = Path(directory) / name
             if candidate.is_file() and not os.access(candidate, os.X_OK):
-                result.update(installed=True, status="PERMISSION_DENIED", recommended_action="Check executable permissions.")
+                result.update(installed=True, path=str(candidate.absolute()), status="PERMISSION_DENIED", recommended_action="Check executable permissions.")
                 break
         return result
     if not os.access(executable, os.X_OK):
@@ -85,6 +86,7 @@ def doctor(home=None, wordlist=None):
              {**TOOLS, "cyberrecon-dns": "Optional bounded DNS worker"}.items()}
     dependencies = {}
     for package, module in DEPENDENCIES.items():
+        installed, version = False, None
         try:
             installed = importlib.util.find_spec(module) is not None
             version = importlib.metadata.version(package) if installed else None
@@ -97,12 +99,27 @@ def doctor(home=None, wordlist=None):
                 status = "READY" if numbers and numbers >= minimum and numbers[0] < upper else "UNSUPPORTED"
             dependencies[package] = {"installed": installed, "version": version, "status": status}
         except (ImportError, ValueError, OSError, importlib.metadata.PackageNotFoundError):
-            dependencies[package] = {"installed": False, "version": None, "status": "BROKEN"}
+            dependencies[package] = {"installed": installed, "version": version, "status": "BROKEN"}
     root = Path(home or os.environ.get("CYBERRECON_HOME") or Path.home() / ".local/share/cyberrecon").expanduser()
     ancestor = root
     while not ancestor.exists() and ancestor != ancestor.parent:
         ancestor = ancestor.parent
     workspace_ok = ancestor.is_dir() and os.access(ancestor, os.W_OK | os.X_OK)
+    database_status = "NOT_CREATED"
+    if workspace_ok:
+        try:
+            for name in ("cyberrecon.db", "cyberrecon.db-wal", "cyberrecon.db-shm"):
+                candidate = root / name
+                if candidate.is_symlink() or candidate.exists() and not candidate.is_file():
+                    database_status = "UNSAFE_DATABASE_PATH"
+                    break
+            else:
+                database = root / "cyberrecon.db"
+                if database.exists():
+                    with database.open("rb") as stream:
+                        database_status = "HEADER_VALID" if stream.read(16) == b"SQLite format 3\x00" else "INVALID_DATABASE_HEADER"
+        except OSError:
+            database_status = "DATABASE_PERMISSION_ERROR"
     path = Path(wordlist).expanduser() if wordlist else None
     wordlist_status = "NOT_CONFIGURED"
     if path:
@@ -110,7 +127,7 @@ def doctor(home=None, wordlist=None):
     return {"version": __version__, "python": sys.version.split()[0],
             "python_status": "READY" if sys.version_info >= (3, 12) else "UNSUPPORTED", "supported_python": ">=3.12",
             "tools": tools, "dependencies": dependencies,
-            "configuration": {"workspace": "READY" if workspace_ok else "PERMISSION_OR_PATH_ERROR", "wordlist": wordlist_status},
+            "configuration": {"workspace": "READY" if workspace_ok else "PERMISSION_OR_PATH_ERROR", "wordlist": wordlist_status, "database": database_status},
             "notes": ["Local version probes have 3-second and 64-KiB limits; no tools are installed.",
                       "READY indicates a CLI family match, not full external engine qualification.",
                       "dnsx/httpx/naabu/katana are imports; Gobuster is not wired; ffuf/WhatWeb active collection uses native safety.",

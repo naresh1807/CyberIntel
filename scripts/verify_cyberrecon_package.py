@@ -39,9 +39,9 @@ def main():
         assert (stage / 'usr/share/applications/cyberrecon.desktop').is_file()
         environment = {**os.environ, 'PYTHONPATH': str(application), 'CYBERRECON_HOME': str(home), 'QT_QPA_PLATFORM': 'offscreen'}
         for flag in ('--version', '--help'):
-            subprocess.run([sys.executable, '-m', 'cyberrecon.cli', flag], cwd=root, env=environment, check=True, timeout=15, stdout=subprocess.DEVNULL)
+            subprocess.run([sys.executable, '-m', 'cyberrecon', flag], cwd=root, env=environment, check=True, timeout=15, stdout=subprocess.DEVNULL)
         # Native/import startup must not depend on omitted CyberIntel GUI modules.
-        created = subprocess.check_output([sys.executable, '-m', 'cyberrecon.cli', 'project', 'Packaging fixture',
+        created = subprocess.check_output([sys.executable, '-m', 'cyberrecon', 'project', 'Packaging fixture',
                     '--include', '127.0.0.1', '--authority', 'Own local package fixture'], cwd=root, env=environment, text=True, timeout=15)
         assert json.loads(created)
         marker = home / 'user-config.json'; marker.write_text('{"fixture":true}')

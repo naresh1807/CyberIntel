@@ -38,17 +38,17 @@ jobs:
       - name: Build previous and current Debian packages
         run: |
           mkdir -p /tmp/cyberrecon-prior
-          git archive --output=/tmp/cyberrecon-prior.tar 5718fdb
+          git archive --output=/tmp/cyberrecon-prior.tar c1d08eb
           tar -xf /tmp/cyberrecon-prior.tar -C /tmp/cyberrecon-prior
           python3 /tmp/cyberrecon-prior/scripts/build-cyberrecon-deb.py --output /tmp/cyberrecon-prior-dist
           python3 scripts/build-cyberrecon-deb.py --output dist/qualification
       - name: Install previous package and preserve user data across upgrade
         run: |
-          apt-get install -y --no-install-recommends /tmp/cyberrecon-prior-dist/cyberrecon_0.2.0-1_all.deb
+          apt-get install -y --no-install-recommends /tmp/cyberrecon-prior-dist/cyberrecon_0.2.0-2_all.deb
           echo 'CYBERRECON_HOME=/tmp/cyberrecon-lifecycle-workspace' >> "$GITHUB_ENV"
           CYBERRECON_HOME=/tmp/cyberrecon-lifecycle-workspace cyberrecon project 'Lifecycle fixture' --include 127.0.0.1 --authority 'Own container fixture'
           echo '{"fixture":true}' > /tmp/cyberrecon-lifecycle-workspace/user-config.json
-          apt-get install -y --no-install-recommends ./dist/qualification/cyberrecon_0.2.0-2_all.deb
+          apt-get install -y --no-install-recommends ./dist/qualification/cyberrecon_0.2.0-3_all.deb
       - name: Validate installed package and upgraded database
         run: |
           python3 --version

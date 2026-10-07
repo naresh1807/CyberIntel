@@ -15,7 +15,9 @@ def host_of(value):
         if parts.scheme not in {"http", "https"} or parts.username or parts.password or not parts.hostname:
             raise ValidationError("Use an HTTP(S) target without credentials.")
         try:
-            parts.port
+            port = parts.port
+            if port is not None and not 1 <= port <= 65535:
+                raise ValueError("Invalid port")
         except ValueError:
             raise ValidationError("Invalid target port.") from None
         value = parts.hostname

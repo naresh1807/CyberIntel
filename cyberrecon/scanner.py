@@ -292,6 +292,7 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                 if row["product"]:
                     save("technologies", key, {"product": row["product"], "version": row["version"],
                          "cpe": row["cpe"], "lifecycle": "UNKNOWN", "note": "Validate version and distribution backports before assessing CVEs."}, "Nmap", confidence="engine-observed")
+                    edge("service:" + key + ":" + row["service"], "technology:" + key, "reports")
             for row in records["hosts"]:
                 if row["timed_out"]:
                     warn("Nmap host timed out; port inventory may be incomplete: " + row["ip"])

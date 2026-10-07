@@ -67,6 +67,8 @@ def tls_metadata(response):
 
 
 def clean_url(value, base=None):
+    if not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 or ord(c) == 127 or c.isspace() for c in value):
+        raise ValidationError("Invalid URL.")
     parts = urlsplit(urljoin(base, value) if base else value)
     if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username or parts.password:
         raise ValidationError("Only HTTP(S) URLs without credentials are supported.")
@@ -78,7 +80,10 @@ def clean_url(value, base=None):
         raise ValidationError("Invalid URL port.") from None
     if port is not None and not 1 <= port <= 65535:
         raise ValidationError("Invalid HTTP port.")
-    host = parts.hostname.encode("idna").decode().lower()
+    from .scope import host_of
+    host = host_of(parts.hostname)
+    if port == (443 if parts.scheme == "https" else 80):
+        port = None
     netloc = f"[{host}]" if ":" in host else host
     if port:
         netloc += ":" + str(port)
