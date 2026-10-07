@@ -113,3 +113,35 @@ def test_production_trust_has_no_insecure_commands():
     assert 'name: cyberrecon-production' in workflow and 'if: always()' in workflow
     for unsafe in ('trusted=yes', 'allow-insecure=yes', '--allow-unauthenticated', 'apt-key', 'set -x'):
         assert unsafe not in workflow
+
+
+@pytest.mark.parametrize('configured', ['', '1234', 'z' * 40, '9A0A07DA92FEBAADDAC19A94FB46922D34735C79'])
+def test_invalid_or_development_configuration_rejected(configured):
+    module = signer()
+    with pytest.raises(ValueError):
+        module.inspect_imported_key(listing(module), configured)
+
+
+@pytest.mark.parametrize('validity', ['r', 'e', 'd', 'i'])
+def test_invalid_primary_rejected(validity):
+    module = signer()
+    with pytest.raises(ValueError):
+        module.inspect_imported_key(listing(module).replace('sec:u:', 'sec:' + validity + ':'), module.PRODUCTION_FINGERPRINT)
+
+
+def test_signing_dry_run_cannot_deploy_or_publish():
+    workflow = (ROOT / '.github/workflows/release-apt.yml').read_text()
+    assert 'signing_dry_run:' in workflow
+    assert 'if: inputs.publish || inputs.signing_dry_run' in workflow
+    assert 'Select publication or signing dry-run, never both.' in workflow
+    sign = workflow.split('\n  sign:', 1)[1].split('\n  deploy:', 1)[0]
+    assert 'unset APT_SIGNING_PRIVATE_KEY APT_SIGNING_PASSPHRASE' in sign
+    assert 'test_cyberrecon_apt_tampering.py' in sign
+    assert '- if: inputs.publish\n        uses: actions/upload-pages-artifact@' in sign
+    for job in ('deploy', 'publish'):
+        block = workflow.split('\n  ' + job + ':', 1)[1]
+        assert 'if: inputs.publish' in block.split('steps:', 1)[0]
+    assert 'write-all' not in workflow
+    assert 'permissions:' not in sign  # inherits contents: read only
+    import re
+    assert all(re.fullmatch(r'[^@]+@[a-f0-9]{40}', action) for action in re.findall(r'uses: (\S+)', workflow))

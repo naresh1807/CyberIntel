@@ -41,7 +41,7 @@ def test_signed_repository_and_hash_chain(signed_repository):
     assert not (root / 'dists/stable/main/binary-arm64').exists()
 
 
-@pytest.mark.parametrize('member', ['dists/stable/InRelease', 'dists/stable/Release.gpg',
+@pytest.mark.parametrize('member', ['dists/stable/InRelease', 'dists/stable/Release.gpg', 'dists/stable/Release',
                                   'dists/stable/main/binary-amd64/Packages',
                                   'dists/stable/main/binary-amd64/Packages.gz',
                                   'pool/main/c/cyberrecon/cyberrecon_0.2.0-5_all.deb'])
@@ -128,3 +128,32 @@ def test_release_workflow_keeps_signing_secrets_outside_artifact_paths():
     assert 'sign_cyberrecon_release.py' in sign
     paths = re.findall(r'path: (.+)', workflow)
     assert paths and all(path.startswith('dist/release') for path in paths)
+
+
+@pytest.mark.parametrize('member', ['InRelease', 'Release.gpg'])
+def test_missing_signature_rejected(signed_repository, tmp_path, member):
+    original, fingerprint = signed_repository
+    repository = tmp_path / 'missing'
+    shutil.copytree(original, repository)
+    (repository / 'dists/stable' / member).unlink()
+    with pytest.raises(ValueError):
+        module('verify_cyberrecon_apt').verify(repository, original / 'cyberrecon-archive-keyring.gpg', fingerprint)
+
+
+def test_different_signing_key_rejected_even_if_trusted(signed_repository, tmp_path):
+    original, fingerprint = signed_repository
+    packages = sorted((original / 'pool/main/c/cyberrecon').glob('*.deb'))
+    other = module('build-cyberrecon-apt').build(packages, tmp_path / 'other', development_key=True)
+    combined = tmp_path / 'both-public-keys.gpg'
+    combined.write_bytes((original / 'cyberrecon-archive-keyring.gpg').read_bytes() +
+                         (other / 'cyberrecon-archive-keyring.gpg').read_bytes())
+    with pytest.raises(ValueError, match='fingerprint'):
+        module('verify_cyberrecon_apt').verify(other, combined, fingerprint)
+
+
+def test_runtime_tamper_checks_preserve_original(signed_repository):
+    original, fingerprint = signed_repository
+    before = {str(p.relative_to(original)): p.read_bytes() for p in original.rglob('*') if p.is_file()}
+    result = module('test_cyberrecon_apt_tampering').check(original, original / 'cyberrecon-archive-keyring.gpg', fingerprint)
+    assert result['status'] == 'PASS' and len(result['rejected']) == 7
+    assert before == {str(p.relative_to(original)): p.read_bytes() for p in original.rglob('*') if p.is_file()}

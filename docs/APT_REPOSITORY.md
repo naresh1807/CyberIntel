@@ -270,3 +270,29 @@ After protected signing, use verify_cyberrecon_apt.py --production with this pin
 Actual production signing/secret installation/Environment protection, hosted HTTPS
 and clean Kali/Parrot lifecycle remain NOT TESTED or BLOCKED. Local mock tests
 cannot prove that the owner's real key/secrets are configured or usable.
+
+
+## Protected signing dry-run
+
+After reviewing/merging the workflow changes, manually dispatch **CyberRecon
+protected APT release** on main with `signing_dry_run=true`, `publish=false`,
+`refresh_only=false`. Selecting signing dry-run and publication together fails.
+Both preparation and signing use cyberrecon-production approval; the package
+requires the owner-supplied public maintainer identity. Configure the existing
+fingerprint variable and the two secrets only in that Environment. Repository-level
+duplicate signing secrets are neither needed nor permitted; the owner must check
+Settings because workflow code cannot determine a secret's scope at runtime.
+
+This mode builds the package, generates metadata, imports and independently checks
+the existing production key, signs, verifies both signatures and the index/package
+hash chain, then rejects altered disposable repository copies. The full preparation
+suite also checks a different disposable signing key. Python/workflow cleanup runs
+on failure. Secrets are removed from Python's environment immediately and unset
+in the shell before verification/scanning subprocesses. Public signed artifacts
+are retained for review; neither Pages upload/deployment nor GitHub Release creation
+runs. The signing job retains only contents: read permission.
+
+A successful real dry-run is evidence for production signing only. Publication still
+requires exact-commit qualification, reviewed clean-tree evidence, HTTPS hosting
+and every existing release gate. The dry-run has not been executed on GitHub here.
+See [final signing security review](APT_SIGNING_SECURITY_REVIEW.md).

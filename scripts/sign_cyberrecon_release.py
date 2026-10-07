@@ -70,8 +70,8 @@ def main():
     parser.add_argument('package')
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
-    key = os.environ.get('APT_SIGNING_PRIVATE_KEY', '')
-    password = os.environ.get('APT_SIGNING_PASSPHRASE', '')
+    key = os.environ.pop('APT_SIGNING_PRIVATE_KEY', '')
+    password = os.environ.pop('APT_SIGNING_PASSPHRASE', '')
     fingerprint = os.environ.get('APT_SIGNING_FINGERPRINT', '')
     if not key or not password or not fingerprint:
         parser.error('PRODUCTION SIGNING KEY REQUIRED. Protected production signing secrets and full fingerprint are required.')

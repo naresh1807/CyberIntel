@@ -6,6 +6,10 @@ on:
         description: Publish only after exact-commit desktop/VM qualification and identity/HTTPS setup
         type: boolean
         default: false
+      signing_dry_run:
+        description: Protected production-key signing and verification without Pages or Release publication
+        type: boolean
+        default: false
       refresh_only:
         description: Renew signed APT metadata without creating another GitHub release
         type: boolean
@@ -18,7 +22,7 @@ concurrency:
 jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
-    environment: ${{ inputs.publish && 'cyberrecon-production' || 'cyberrecon-candidate' }}
+    environment: ${{ (inputs.publish || inputs.signing_dry_run) && 'cyberrecon-production' || 'cyberrecon-candidate' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -28,6 +32,7 @@ jobs:
       RELEASE_QUALIFIED_COMMIT: ${{ vars.RELEASE_QUALIFIED_COMMIT }}
       RELEASE_QUALIFICATION_JSON: ${{ vars.RELEASE_QUALIFICATION_JSON }}
       PUBLISH: ${{ inputs.publish }}
+      SIGNING_DRY_RUN: ${{ inputs.signing_dry_run }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -40,6 +45,10 @@ jobs:
           go-version: '1.26.8'
       - name: Fail closed before production work
         run: |
+          if [ "$PUBLISH" = true ] && [ "$SIGNING_DRY_RUN" = true ]; then
+            echo 'Select publication or signing dry-run, never both.' >&2
+            exit 1
+          fi
           if [ "$PUBLISH" = true ]; then
             python scripts/prepare_cyberrecon_release.py --production-gate
           fi
@@ -59,7 +68,7 @@ jobs:
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           (cd workers/dns && go test -race ./... && CGO_ENABLED=0 go build -trimpath -buildvcs=false -o ../../dist/release/cyberrecon-dns .)
           python -m build --no-isolation --outdir dist/release
-          if [ "$PUBLISH" = true ]; then
+          if [ "$PUBLISH" = true ] || [ "$SIGNING_DRY_RUN" = true ]; then
             python scripts/build-cyberrecon-deb.py --worker dist/release/cyberrecon-dns --output dist/release --production --maintainer "$CYBERRECON_MAINTAINER"
           else
             python scripts/build-cyberrecon-deb.py --worker dist/release/cyberrecon-dns --output dist/release
@@ -74,7 +83,7 @@ jobs:
           path: dist/release
   sign:
     needs: prepare
-    if: inputs.publish
+    if: inputs.publish || inputs.signing_dry_run
     environment:
       name: cyberrecon-production
     runs-on: ubuntu-24.04
@@ -99,7 +108,9 @@ jobs:
         run: |
           umask 077
           python3 scripts/sign_cyberrecon_release.py dist/release/cyberrecon_0.2.0-5_amd64.deb --output dist/release/apt
+          unset APT_SIGNING_PRIVATE_KEY APT_SIGNING_PASSPHRASE
           python3 scripts/verify_cyberrecon_apt.py dist/release/apt --keyring dist/release/apt/cyberrecon-archive-keyring.gpg --fingerprint "$APT_SIGNING_FINGERPRINT" --production
+          python3 scripts/test_cyberrecon_apt_tampering.py dist/release/apt --keyring dist/release/apt/cyberrecon-archive-keyring.gpg --fingerprint "$APT_SIGNING_FINGERPRINT" --production
           python3 scripts/check_release_security.py --artifacts dist/release
           python3 scripts/prepare_cyberrecon_release.py --checksums dist/release
       - name: Remove temporary production signing material
@@ -115,7 +126,8 @@ jobs:
         with:
           name: signed-release
           path: dist/release
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - if: inputs.publish
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: dist/release/apt
   deploy:

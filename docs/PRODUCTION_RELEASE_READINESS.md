@@ -97,7 +97,7 @@ Kali and Parrot Security amd64 desktop VMs with default APT behavior, normal-use
 CLI/Doctor/GUI/menu, old→new data/report preservation, reboot, remove, purge and
 reinstall. Preserve OS/session, package hashes and logs. Do not reboot this host.
 2. Configure the owner-supplied public maintainer name/email, provision HTTPS APT hosting and an
-operator-managed signing key through protected secrets; independently distribute
+the existing owner-controlled signing key through protected secrets; independently distribute
 its public fingerprint and execute the trust/rotation/recovery checks.
 3. Run the candidate GitHub workflow, review every mandatory gate and exact-commit
 artifact, populate protected qualification evidence, then approve production
@@ -107,7 +107,7 @@ publication. No tag or public release is authorized by incomplete evidence.
 ## APT distribution phase
 
 Production repository remains BLOCKED: public HTTPS hosting is not configured.
-Production signing remains BLOCKED: production key has not been provisioned.
+Production signing remains BLOCKED: the owner-controlled key has not been configured/tested in the protected GitHub Environment.
 Clean Kali and Parrot installation through public APT: NOT TESTED.
 Existing tooling is reused by .github/workflows/release-apt.yml, with signed
 metadata verification and protected manual publication. Local Debian APT tests
@@ -132,3 +132,7 @@ See the exact owner setup in [APT operations](APT_REPOSITORY.md).
 CYBERRECON v0.2.0 PRODUCTION RELEASE DECISION
 
 **NOT APPROVED**
+
+Final signing security review: [APT_SIGNING_SECURITY_REVIEW.md](APT_SIGNING_SECURITY_REVIEW.md).
+Local full suite now passes 451 tests; the protected signing dry-run is implemented
+but has not been executed on GitHub. No real-world release gate is promoted by this result.

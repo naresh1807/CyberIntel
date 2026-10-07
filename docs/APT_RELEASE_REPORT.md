@@ -130,3 +130,8 @@ closed because the HTTPS APT hosting URL is missing.
 Dedicated signing/APT/release regression run: **51 passed** (2.63 seconds),
 including real development-only InRelease and Release.gpg verification.
 Production-key signature verification remains **NOT TESTED**.
+
+Final security review: [APT_SIGNING_SECURITY_REVIEW.md](APT_SIGNING_SECURITY_REVIEW.md).
+451 Python tests and the Go race suite passed. Protected signing dry-run and
+expanded tamper checks are implemented; real owner-key/GitHub/HTTPS/VM lifecycle
+results remain NOT TESTED or BLOCKED. Production release remains NOT APPROVED.
