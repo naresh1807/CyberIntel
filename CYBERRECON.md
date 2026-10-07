@@ -134,3 +134,13 @@ NetworkX >=3.2.1 and Plotly >=5.20 support with distro packages, and cleans
 package bytecode on removal/upgrade. Python remains >=3.12. Doctor now checks
 NumPy and dependency patch versions. See [release qualification](docs/RELEASE_QUALIFICATION.md)
 for supported/tested versions, real lifecycle evidence, and remaining gates.
+
+
+## Production release preparation
+
+The Debian 0.2.0-5 candidate retains CyberRecon 0.2.0 and CyberIntel compatibility.
+MIT is selected; public maintainer identity and HTTPS APT hosting remain unavailable.
+See [production readiness](docs/PRODUCTION_RELEASE_READINESS.md),
+[release checklist](docs/RELEASE_CHECKLIST.md), [APT/signing operations](docs/APT_REPOSITORY.md),
+and [compatibility migration plan](docs/COMPATIBILITY_MIGRATION.md).
+Desktop VM, reboot and production publication gates remain blocked or untested.

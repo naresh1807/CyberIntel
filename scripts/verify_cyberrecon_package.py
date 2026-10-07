@@ -39,7 +39,12 @@ def main():
         assert (stage / 'usr/share/doc/cyberrecon/docs/AUDIT.md').is_file()
         assert launcher.stat().st_mode & 0o111
         assert "'/usr/share/cyberrecon'" in launcher.read_text()
-        assert (stage / 'usr/share/applications/cyberrecon.desktop').is_file()
+        desktop = stage / 'usr/share/applications/cyberrecon.desktop'
+        assert 'Exec=/usr/bin/cyberrecon' in desktop.read_text()
+        assert 'Icon=cyberrecon' in desktop.read_text()
+        assert (stage / 'usr/share/icons/hicolor/scalable/apps/cyberrecon.svg').is_file()
+        assert (application / 'cyberrecon/assets/cyberrecon.svg').is_file()
+        assert (stage / 'usr/share/doc/cyberrecon/copyright').read_text().startswith('MIT License')
         environment = {**os.environ, 'PYTHONPATH': str(application), 'CYBERRECON_HOME': str(home), 'QT_QPA_PLATFORM': 'offscreen'}
         for flag in ('--version', '--help'):
             subprocess.run([sys.executable, '-m', 'cyberrecon', flag], cwd=root, env=environment, check=True, timeout=15, stdout=subprocess.DEVNULL)

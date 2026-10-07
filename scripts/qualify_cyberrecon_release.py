@@ -61,6 +61,8 @@ def main():
             raise RuntimeError(name + ' failed; see ' + str(out / (name + '.log')))
         return log.read_text(errors='replace')
 
+    preserved_reports = {}
+
     def fixture():
         with sqlite3.connect(home / 'cyberrecon.db') as db:
             assert db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
@@ -72,6 +74,8 @@ def main():
         assert (home.stat().st_mode & 0o777) == 0o700
         assert ((home / 'cyberrecon.db').stat().st_mode & 0o777) == 0o600
         assert (home / 'preservation-marker.txt').read_text() == 'Keep user data\n'
+        for name, digest in preserved_reports.items():
+            assert hashlib.sha256((home / 'reports/fixture' / name).read_bytes()).hexdigest() == digest
 
     try:
         assert sys.version_info >= (3, 12), 'Python below supported minimum'
@@ -86,8 +90,10 @@ def main():
         run('install-dependencies', repair, timeout=900)
         assert run('installed-previous', ['dpkg-query', '-W', '-f=${Status} ${Version}', 'cyberrecon']).strip() == 'install ok installed ' + old_version
         run('create-fixture', ['cyberrecon', 'project', 'Lifecycle fixture', '--include', '127.0.0.1', '--authority', 'Own isolated loopback lab'])
-        run('create-history-fixture', [sys.executable, '-c', "import sys; sys.path.insert(0,'/usr/share/cyberrecon'); from cyberrecon.storage import Repository; r=Repository(); p=r.projects()[0]['id']; s=r.start_scan(p,'127.0.0.1',{}); r.save(s,'assets','127.0.0.1',{'host':'127.0.0.1'},'Synthetic offline lifecycle fixture'); r.finish(s,[])"])
+        run('create-history-fixture', [sys.executable, '-c', "import sys; sys.path.insert(0,'/usr/share/cyberrecon'); from cyberrecon.storage import Repository; r=Repository(); p=r.projects()[0]['id']; s=r.start_scan(p,'127.0.0.1',{}); r.save(s,'assets','127.0.0.1',{'host':'127.0.0.1'},'Synthetic offline lifecycle fixture'); r.finish(s,[]); r.export_json(s,r.home/'reports/fixture')"])
         (home / 'preservation-marker.txt').write_text('Keep user data\n')
+        preserved_reports.update({p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (home / 'reports/fixture').iterdir()})
+        assert preserved_reports
         fixture()
         run('upgrade', ['apt-get', '-o', 'APT::Sandbox::User=root', 'install', '-y', '--no-install-recommends', str(current)], timeout=900)
         assert run('installed-current', ['dpkg-query', '-W', '-f=${Status} ${Version}', 'cyberrecon']).strip() == 'install ok installed ' + new_version
@@ -96,7 +102,7 @@ def main():
         doctor = json.loads(run('doctor', ['cyberrecon', '--doctor']))
         assert doctor['python_status'] == 'READY'
         assert all(value['status'] == 'READY' for value in doctor['dependencies'].values()), doctor['dependencies']
-        run('package-owner', ['dpkg-query', '-S', '/usr/bin/cyberrecon', '/usr/share/cyberrecon/cyberrecon/cli.py'])
+        run('package-owner', ['dpkg-query', '-S', '/usr/bin/cyberrecon', '/usr/share/cyberrecon/cyberrecon/cli.py', '/usr/share/applications/cyberrecon.desktop', '/usr/share/icons/hicolor/scalable/apps/cyberrecon.svg'])
         assert Path('/usr/bin/cyberrecon').stat().st_mode & 0o777 == 0o755
         assert not Path('/usr/bin/cyberrecon').stat().st_mode & 0o6000
         fixture()
@@ -111,9 +117,11 @@ def main():
         assert not run('dpkg-audit', ['dpkg', '--audit']).strip()
         run('remove', ['apt-get', '-o', 'APT::Sandbox::User=root', 'remove', '-y', 'cyberrecon'])
         assert not Path('/usr/bin/cyberrecon').exists()
+        assert not Path('/usr/share/applications/cyberrecon.desktop').exists()
+        assert not Path('/usr/share/icons/hicolor/scalable/apps/cyberrecon.svg').exists()
         assert shutil.which('cyberrecon') is None
         fixture()
-        # With no conffiles or maintainer hooks, dpkg forgets this package on
+        # With no conffiles, dpkg forgets this package on
         # remove. Reinstall it before testing purge as a separate lifecycle.
         run('reinstall-before-purge', ['dpkg', '-i', str(current)])
         run('purge', ['apt-get', '-o', 'APT::Sandbox::User=root', 'purge', '-y', 'cyberrecon'])

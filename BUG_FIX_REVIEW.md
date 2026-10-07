@@ -136,3 +136,13 @@ remove/purge and project/scan/observation/user-marker preservation passed.
 Default workspace permissions and non-root namespace UID 1000 startup passed.
 Desktop VMs, full Security desktop editions, multi-user package ownership,
 public APT hosting and final license/maintainer identity remain release gates.
+
+
+## Production release preparation
+
+The Debian 0.2.0-5 candidate retains CyberRecon 0.2.0 and CyberIntel compatibility.
+MIT is selected; public maintainer identity and HTTPS APT hosting remain unavailable.
+See [production readiness](docs/PRODUCTION_RELEASE_READINESS.md),
+[release checklist](docs/RELEASE_CHECKLIST.md), [APT/signing operations](docs/APT_REPOSITORY.md),
+and [compatibility migration plan](docs/COMPATIBILITY_MIGRATION.md).
+Desktop VM, reboot and production publication gates remain blocked or untested.

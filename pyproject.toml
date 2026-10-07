@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "cyberintel-suite"
 version = "0.1.0"
 description = "Scope-controlled CyberRecon reconnaissance with CyberIntel compatibility and offline forensics"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
   "PySide6>=6.8,<7", "httpx>=0.28,<1", "cryptography>=44",
   "pandas>=2.2,<4", "numpy>=2,<3", "networkx>=3.2.1,<4", "pyqtgraph>=0.13,<1",
@@ -17,12 +19,19 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pyinstaller>=6"]
 
+[project.urls]
+Repository = "https://github.com/naresh1807/CyberIntel"
+Documentation = "https://github.com/naresh1807/CyberIntel/blob/main/CYBERRECON.md"
+
 [project.scripts]
 cyberintel = "cyberintel.app:main"
 cyberrecon = "cyberrecon.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["cyberintel*", "cyberrecon*"]
+
+[tool.setuptools.package-data]
+cyberrecon = ["assets/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -3,7 +3,7 @@ import json
 import threading
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, QUrl, Qt
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QPushButton, QTabWidget, QTextEdit, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem,
@@ -132,10 +132,17 @@ class Window(QMainWindow):
         super().__init__()
         self.repo, self.cancel, self.worker = repo, threading.Event(), None
         self.setWindowTitle("CyberRecon — Authorized Reconnaissance")
+        from pathlib import Path
+        self.setWindowIcon(QIcon(str(Path(__file__).parent / 'assets/cyberrecon.svg')))
         self.resize(1150, 800)
         root = QWidget()
         layout = QVBoxLayout(root)
-        layout.addWidget(QLabel("CyberRecon  •  Scope → Discovery → Evidence → Comparison"))
+        header = QHBoxLayout()
+        header.addWidget(QLabel("CyberRecon  •  Scope → Discovery → Evidence → Comparison"), 1)
+        about = QPushButton("About CyberRecon")
+        about.clicked.connect(self.about)
+        header.addWidget(about)
+        layout.addLayout(header)
         row = QHBoxLayout()
         self.projects = QComboBox()
         self.projects.currentIndexChanged.connect(self.refresh_scans)
@@ -242,6 +249,11 @@ class Window(QMainWindow):
         layout.addWidget(self.tabs)
         self.setCentralWidget(root)
         self.refresh_projects()
+
+    def about(self):
+        from . import __version__
+        QMessageBox.information(self, 'About CyberRecon',
+            f'CyberRecon {__version__}\nAuthorized, scope-controlled reconnaissance.\nMIT License • CyberRecon contributors\nDesktop and production release gates are documented in the repository.')
 
     def refresh_projects(self, preferred=None):
         self.projects.blockSignals(True)

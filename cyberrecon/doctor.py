@@ -46,6 +46,7 @@ def tool_status(name, capability):
     result = {"on_path": on_path, "installed": bool(executable), "path": str(Path(executable).absolute()) if executable else None,
               "version": None, "minimum_supported_version": ".".join(map(str, minimum)) if minimum else None,
               "supported_version": supported, "compatibility": "unknown", "status": "OPTIONAL",
+              "requirement": "Recommended for port scanning" if name == "nmap" else "Optional",
               "capability": capability, "recommended_action": "Install only if this optional capability is needed."}
     if not executable:
         for directory in os.get_exec_path():
@@ -100,6 +101,13 @@ def doctor(home=None, wordlist=None):
             dependencies[package] = {"installed": installed, "version": version, "status": status}
         except (ImportError, ValueError, OSError, importlib.metadata.PackageNotFoundError):
             dependencies[package] = {"installed": installed, "version": version, "status": "BROKEN"}
+    for package, result in dependencies.items():
+        minimum, upper = DEPENDENCY_RANGES[package]
+        result.update(requirement="Required", minimum_supported_version=".".join(map(str, minimum)),
+                      supported_version=">=" + ".".join(map(str, minimum)) + ", <" + str(upper),
+                      compatibility="Supported version" if result["status"] == "READY" else "Not ready",
+                      recommended_action="No action required." if result["status"] == "READY" else
+                      "Resolve this required dependency through the supported distro package or virtual environment.")
     root = Path(home or os.environ.get("CYBERRECON_HOME") or Path.home() / ".local/share/cyberrecon").expanduser()
     ancestor = root
     while not ancestor.exists() and ancestor != ancestor.parent:

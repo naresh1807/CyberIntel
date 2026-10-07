@@ -27,10 +27,11 @@ jobs:
           mkdir -p /run
           echo RELEASE_TEST_ONLY > /run/cyberrecon-disposable-root
           apt-get update
-          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
-      - uses: actions/checkout@v4
+          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark apt-utils gnupg desktop-file-utils libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Run source tests on distribution Python
         run: |
           python3 -m venv .venv
@@ -44,13 +45,13 @@ jobs:
       - name: Build previous and current Debian packages
         run: |
           mkdir -p /tmp/cyberrecon-prior
-          git archive --output=/tmp/cyberrecon-prior.tar c90c680
+          git archive --output=/tmp/cyberrecon-prior.tar a173634
           tar -xf /tmp/cyberrecon-prior.tar -C /tmp/cyberrecon-prior
           python3 /tmp/cyberrecon-prior/scripts/build-cyberrecon-deb.py --output /tmp/cyberrecon-prior-dist
           python3 scripts/build-cyberrecon-deb.py --output dist/qualification
       - name: Qualify installed package lifecycle and local scan
         run: |
-          python3 scripts/qualify_cyberrecon_release.py /tmp/cyberrecon-prior-dist/cyberrecon_0.2.0-3_all.deb dist/qualification/cyberrecon_0.2.0-4_all.deb
+          python3 scripts/qualify_cyberrecon_release.py /tmp/cyberrecon-prior-dist/cyberrecon_0.2.0-4_all.deb dist/qualification/cyberrecon_0.2.0-5_all.deb
       - name: Preserve evidence even on failure
         if: always()
         run: |
@@ -58,7 +59,7 @@ jobs:
           test ! -d /tmp/cyberrecon-qualification || cp -a /tmp/cyberrecon-qualification/. artifacts/qualification/
           printf '%s\n' "$CYBERRECON_TEST_IMAGE" > artifacts/qualification/image.txt
           cat /etc/os-release > artifacts/qualification/os-release.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: qualification-${{ strategy.job-index }}

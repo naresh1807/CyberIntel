@@ -387,3 +387,13 @@ Verification here uses synthetic XML and a mocked Nmap process, including the GU
 - [Cert Spotter fallback API and rate limits](https://sslmate.com/help/reference/ct_search_api_v1)
 
 Only public and authorized metadata/files are used. No stolen password databases, private telecom access, access-control bypass or malware-download operations are implemented.
+
+
+## Production release preparation
+
+The Debian 0.2.0-5 candidate retains CyberRecon 0.2.0 and CyberIntel compatibility.
+MIT is selected; public maintainer identity and HTTPS APT hosting remain unavailable.
+See [production readiness](docs/PRODUCTION_RELEASE_READINESS.md),
+[release checklist](docs/RELEASE_CHECKLIST.md), [APT/signing operations](docs/APT_REPOSITORY.md),
+and [compatibility migration plan](docs/COMPATIBILITY_MIGRATION.md).
+Desktop VM, reboot and production publication gates remain blocked or untested.
