@@ -19,7 +19,7 @@ stage='updating apt repositories'
 printf '%s\n' 'Updating system package lists...'
 "${elevate[@]}" apt-get update
 stage='installing system packages'
-"${elevate[@]}" apt-get install -y python3 python3-venv python3-pip libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 tshark nmap
+"${elevate[@]}" apt-get install -y python3 python3-venv python3-pip libgl1 libfontconfig1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 tshark nmap
 stage='checking Python compatibility'
 python3 -c 'import sys; print("Python:", sys.version.split()[0]); sys.exit("Python 3.12 or newer is required; update Python before installing.") if sys.version_info < (3, 12) else None'
 if [[ -d .venv && ! -x .venv/bin/python ]]; then

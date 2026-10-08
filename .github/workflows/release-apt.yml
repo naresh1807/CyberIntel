@@ -55,12 +55,16 @@ jobs:
       - name: Install test and build dependencies
         run: |
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nmap tshark apt-utils gnupg desktop-file-utils libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nmap tshark apt-utils gnupg desktop-file-utils libgl1 libfontconfig1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
           python -m pip install -r release/tools.txt
           python -m pip install -c release/constraints-python314.txt -e '.[dev]'
       - name: Test, audit and build
         run: |
           mkdir -p dist/release/evidence
+          dpkg-query -W -f='${binary:Package} ${Version}\n' libgl1 libfontconfig1
+          ldconfig -p | grep -F 'libGL.so.1'
+          ldconfig -p | grep -F 'libfontconfig.so.1'
+          python -c 'import sys, PySide6; from PySide6 import QtWidgets; print(sys.version); print("PySide6", PySide6.__version__); print("QtWidgets import: PASS")'
           python -m pytest -q --junitxml dist/release/evidence/pytest.xml
           python scripts/verify_cyberrecon_startup.py
           python scripts/verify_cyberrecon_lab.py --tls --require-nmap
