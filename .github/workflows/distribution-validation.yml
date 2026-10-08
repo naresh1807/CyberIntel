@@ -56,6 +56,7 @@ jobs:
           git config --global --get-all safe.directory
       - name: Run source tests on distribution Python
         run: |
+          python3 scripts/qualify_nmap_runtime.py
           python3 -m venv .venv
           .venv/bin/python -m pip install -e '.[dev]'
           dpkg-query -W -f='${binary:Package} ${Version}\n' libgl1 libfontconfig1

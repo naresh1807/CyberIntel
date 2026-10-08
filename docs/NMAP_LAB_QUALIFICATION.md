@@ -10,6 +10,10 @@ a version-family probe; it does not prove runtime network permissions.
 
 ## Measured reproduction
 
+This section records the earlier image-root reproduction before the runner
+reported exit 126. See the capability conflict investigation below for the new
+reproduction and narrowly guarded environment fix.
+
 The unchanged pinned Kali/Parrot image layers were SHA256 verified and extracted
 into isolated bubblewrap roots. Nmap was installed through each distribution's
 signed APT repositories. No host packages or CI capabilities were changed.
@@ -63,3 +67,48 @@ owned server port OPEN in both jobs. If it still fails, inspect the newly printe
 stderr/exit/capability diagnostics to identify the actual runner-specific cause.
 No authenticated workflow dispatch or new GitHub success is claimed here.
 Production publication, signing identity and pinned images/actions are unchanged.
+
+## Exit 126: Kali file capabilities versus container bounding set
+
+The subsequent runner error identifies an exec failure before Nmap processes
+arguments: `/usr/bin/nmap: 6: exec: /usr/lib/nmap/nmap: Operation not permitted`.
+The installed official Kali package's `nmap.postinst` assigns
+`cap_net_raw,cap_net_admin,cap_net_bind_service+eip` to this ELF executable.
+Linux rejects execution of an effective file-capability binary when its requested
+permitted capabilities exceed the process bounding set. See the
+[kernel capability rules](https://man7.org/linux/man-pages/man7/capabilities.7.html)
+and [Kali's package issue](https://gitlab.com/kalilinux/packages/nmap/-/issues/7).
+`--unprivileged` cannot fix this: the process never starts.
+
+Reproduced using the actual installed Kali binary in an isolated user/mount/PID
+namespace, with the package's file capabilities restored and only NET_ADMIN
+removed from CapBnd. It produced the exact launcher stderr and exit 126.
+AppArmor was unconfined, seccomp disabled, libraries resolved, permissions 0755,
+and `dpkg --verify nmap` passed. Removing only the file capability attribute
+allowed the identical binary, mounts and runtime to execute successfully. The
+actual TLS lab then returned exit 0 and parsed the controlled loopback port OPEN.
+Evidence: `artifacts/nmap-eperm/reproduction.log`. This reproduces the capability
+mechanism, not GitHub's entire runtime; remote CapBnd/xattr evidence is still needed.
+
+`scripts/qualify_nmap_runtime.py` now prints package integrity, relevant mounts,
+AppArmor, seccomp, UID/capability state, file capabilities, permissions, library
+resolution and the real version-probe exit/output before any change. It removes
+the file capability attribute only when all of these conditions hold: a marked
+disposable root, Kali, exit 126, and effective file capabilities outside CapBnd.
+It verifies executable bytes remain unchanged and requires a successful real
+version probe afterward. Other causes remain failures. Parrot has no capability
+removal branch. Production package/application behavior and container capabilities
+are unchanged; the real lab still requires `--unprivileged -sT` and actual OPEN XML.
+
+Full desktop/reboot/package lifecycle and a successful exact-commit GitHub run
+remain required. No publication or production signing change is authorized here.
+
+Checks after this change: native Python suite 457 passed; pinned Kali filesystem
+suite 456 passed with one existing disposable-root lifecycle-guard skip; offscreen
+GUI startup and Go race tests passed. Real unprivileged TLS loopback Nmap runs
+returned exit 0 and OPEN XML in both pinned Kali and Parrot filesystems. Three
+capability/disposable-host guard regressions, workflow shell/pin/security checks
+and the 160-file bounded credential scan passed. No test skip was introduced.
+Public run [37746000518](https://github.com/naresh1807/CyberIntel/actions/runs/37746000518)
+on cc76719 failed Kali source tests and Parrot package lifecycle qualification.
+The latter failure is unresolved; no successful remote rerun is claimed.
