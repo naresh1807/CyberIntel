@@ -27,7 +27,7 @@ jobs:
           mkdir -p /run
           echo RELEASE_TEST_ONLY > /run/cyberrecon-disposable-root
           apt-get update
-          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark apt-utils gnupg desktop-file-utils libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark apt-utils gnupg desktop-file-utils libgl1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
@@ -36,6 +36,9 @@ jobs:
         run: |
           python3 -m venv .venv
           .venv/bin/python -m pip install -e '.[dev]'
+          dpkg-query -W -f='${binary:Package} ${Version}\n' libgl1
+          ldconfig -p | grep -F 'libGL.so.1'
+          .venv/bin/python -c 'import sys, PySide6; from PySide6 import QtWidgets; print(sys.version); print("PySide6", PySide6.__version__); print("QtWidgets import: PASS")'
           .venv/bin/python -m pytest -q
           .venv/bin/python scripts/verify_cyberrecon_startup.py
           .venv/bin/python scripts/verify_cyberrecon_lab.py --tls
