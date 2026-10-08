@@ -26,6 +26,22 @@ jobs:
           uname -a
           mkdir -p /run
           echo RELEASE_TEST_ONLY > /run/cyberrecon-disposable-root
+          case "$CYBERRECON_TEST_IMAGE" in
+            kalilinux/kali-rolling@sha256:*)
+              cat /etc/apt/sources.list.d/kali.sources
+              # The pinned image lacks CA roots. Bootstrap them using signed
+              # indexes from Kali's own archive, avoiding the broken redirector.
+              # Official ownership: https://www.kali.org/docs/community/list-of-official-kali-sites/
+              sed -i 's|http://http.kali.org/kali/|http://archive.kali.org/kali/|' /etc/apt/sources.list.d/kali.sources
+              if [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
+                cat /etc/apt/sources.list.d/kali.sources
+                apt-get -o APT::Update::Error-Mode=any update
+                apt-get install -y --no-install-recommends ca-certificates
+              fi
+              sed -i 's|http://archive.kali.org/kali/|https://archive.kali.org/kali/|' /etc/apt/sources.list.d/kali.sources
+              cat /etc/apt/sources.list.d/kali.sources
+              ;;
+          esac
           apt-get update
           apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark apt-utils gnupg desktop-file-utils libgl1 libfontconfig1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
