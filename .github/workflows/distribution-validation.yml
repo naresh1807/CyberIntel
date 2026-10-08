@@ -32,6 +32,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Trust only the checked-out workspace for container Git commands
+        run: |
+          : "${GITHUB_WORKSPACE:?GitHub workspace is required}"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel
+          git config --global --get-all safe.directory
       - name: Run source tests on distribution Python
         run: |
           python3 -m venv .venv
