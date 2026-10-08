@@ -43,7 +43,7 @@ jobs:
               ;;
           esac
           apt-get update
-          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go nmap tshark apt-utils gnupg desktop-file-utils libgl1 libfontconfig1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          apt-get install -y git python3 python3-venv python3-pip python3-cryptography golang-go gcc libc6-dev nmap tshark apt-utils gnupg desktop-file-utils libgl1 libfontconfig1 libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
@@ -68,7 +68,17 @@ jobs:
           .venv/bin/python scripts/verify_cyberrecon_lab.py --tls --require-nmap
       - name: Go race tests
         working-directory: workers/dns
-        run: go test -race ./...
+        run: |
+          go version
+          gcc --version
+          go env CGO_ENABLED CC GOOS GOARCH CGO_CFLAGS CGO_CPPFLAGS CGO_LDFLAGS
+          gcc -print-sysroot
+          dpkg-query -W -f='${binary:Package} ${Version} ${Status}\n' gcc libc6-dev
+          for header in stdlib errno stdint stdio pthread grp; do
+            test -r "/usr/include/$header.h"
+            ls -l "/usr/include/$header.h"
+          done
+          go test -race ./...
       - name: Build previous and current Debian packages
         run: |
           mkdir -p /tmp/cyberrecon-prior
