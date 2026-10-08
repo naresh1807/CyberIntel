@@ -16,6 +16,18 @@ import subprocess
 import sys
 
 
+def run_logged_process(argv, *, log, env, timeout, json_output=False):
+    """Keep JSON stdout parseable while preserving both channels in the evidence log."""
+    with log.open('w') as stream:
+        result = subprocess.run(argv, cwd='/tmp', env=env,
+                                stdout=subprocess.PIPE if json_output else stream,
+                                stderr=stream if json_output else subprocess.STDOUT,
+                                text=True, timeout=timeout)
+        if json_output:
+            stream.write(result.stdout)
+    return result
+
+
 def workspace_fingerprint(home):
     """Hash logical SQLite state and every report, independent of WAL layout."""
     home = Path(home)
@@ -64,14 +76,13 @@ def main():
     def save():
         report_path.write_text(json.dumps(report, indent=2))
 
-    def run(name, argv, allowed=(0,), timeout=180):
+    def run(name, argv, allowed=(0,), timeout=180, json_output=False):
         log = out / (name + '.log')
         report['checks'][name] = {'status': 'RUNNING'}
         save()
         try:
-            with log.open('w') as stream:
-                result = subprocess.run(argv, cwd='/tmp', env=env, stdout=stream,
-                                        stderr=subprocess.STDOUT, timeout=timeout)
+            result = run_logged_process(argv, log=log, env=env, timeout=timeout,
+                                        json_output=json_output)
         except subprocess.TimeoutExpired:
             report['checks'][name] = {'status': 'TIMEOUT'}
             save()
@@ -80,7 +91,7 @@ def main():
         save()
         if result.returncode not in allowed:
             raise RuntimeError(name + ' failed; see ' + str(out / (name + '.log')))
-        return log.read_text(errors='replace')
+        return result.stdout if json_output else log.read_text(errors='replace')
 
     preserved_reports = {}
     preserved_lab = None
@@ -125,7 +136,7 @@ def main():
         fixture()
         previous_lab = json.loads(run('previous-installed-tls-nmap-reports',
             [sys.executable, str(scripts / 'verify_cyberrecon_lab.py'), '--package', '--tls',
-             '--require-nmap', '--home', str(lab_home)], timeout=240))
+             '--require-nmap', '--home', str(lab_home)], timeout=240, json_output=True))
         assert previous_lab['status'] == 'complete' and previous_lab['real_nmap'] and previous_lab['tls_verified']
         preserved_lab = workspace_fingerprint(lab_home)
         assert {'scan.json', 'observations.csv', 'report.html', 'report.pdf', 'graph.html'} <= {
@@ -137,7 +148,7 @@ def main():
         assert run('installed-current', ['dpkg-query', '-W', '-f=${Status} ${Version}', 'cyberrecon']).strip() == 'install ok installed ' + new_version
         assert run('cli-version', ['cyberrecon', '--version']).strip() == new_version.split('-')[0]
         run('cli-help', ['cyberrecon', '--help'])
-        doctor = json.loads(run('doctor', ['cyberrecon', '--doctor']))
+        doctor = json.loads(run('doctor', ['cyberrecon', '--doctor'], json_output=True))
         assert doctor['python_status'] == 'READY'
         assert all(value['status'] == 'READY' for value in doctor['dependencies'].values()), doctor['dependencies']
         run('package-owner', ['dpkg-query', '-S', '/usr/bin/cyberrecon', '/usr/share/cyberrecon/cyberrecon/cli.py', '/usr/share/applications/cyberrecon.desktop', '/usr/share/icons/hicolor/scalable/apps/cyberrecon.svg'])
@@ -145,7 +156,7 @@ def main():
         assert not Path('/usr/bin/cyberrecon').stat().st_mode & 0o6000
         fixture()
         run('gui-startup', [sys.executable, str(scripts / 'verify_cyberrecon_startup.py'), '--package'])
-        lab = json.loads(run('installed-tls-nmap-reports', [sys.executable, str(scripts / 'verify_cyberrecon_lab.py'), '--package', '--tls', '--require-nmap', '--home', str(out / 'lab')], timeout=240))
+        lab = json.loads(run('installed-tls-nmap-reports', [sys.executable, str(scripts / 'verify_cyberrecon_lab.py'), '--package', '--tls', '--require-nmap', '--home', str(out / 'lab')], timeout=240, json_output=True))
         assert lab['status'] == 'complete' and lab['real_nmap'] and lab['tls_verified'], lab
         reports = Path(lab['reports'])
         for filename in ('scan.json', 'observations.csv', 'report.html', 'report.pdf', 'graph.html'):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise native collection and real Nmap against this script's loopback server."""
 import argparse
+import inspect
 import os
 import re
 import json
@@ -46,6 +47,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, *args):
         pass
+
+
+def lab_scan_options(scanner, diagnostic):
+    if 'nmap_unprivileged' in inspect.signature(scanner).parameters:
+        return {'nmap_unprivileged': True, 'nmap_diagnostic': diagnostic}
+    # The previous Debian revision predates these adapter keywords. Nmap's
+    # documented environment equivalent preserves unprivileged TCP operation
+    # without altering the installed historical package or faking its result.
+    os.environ.pop('NMAP_PRIVILEGED', None)
+    os.environ['NMAP_UNPRIVILEGED'] = '1'
+    print('Historical package: NMAP_UNPRIVILEGED=1 with existing TCP-connect adapter', file=sys.stderr, flush=True)
+    return {}
 
 
 def main():
@@ -104,16 +117,16 @@ def main():
                 capabilities = [line for line in status.read_text().splitlines() if line.startswith(("CapEff:", "CapBnd:", "NoNewPrivs:"))]
             print(json.dumps({"nmap": tool_status("nmap", "Local TCP fixture"),
                               "effective_uid": os.geteuid() if hasattr(os, "geteuid") else None,
-                              "capabilities": capabilities, "mode": "unprivileged TCP-connect; owned loopback only"}), flush=True)
+                              "capabilities": capabilities, "mode": "unprivileged TCP-connect; owned loopback only"}), file=sys.stderr, flush=True)
             def nmap_diagnostic(record):
                 # Only this script's fixed loopback fixture is logged; never env/key material.
                 for name in ("stdout", "stderr"):
                     record[name] = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", record[name])
-                print(json.dumps({"local_nmap_process": record}), flush=True)
+                print(json.dumps({"local_nmap_process": record}), file=sys.stderr, flush=True)
         scheme = "https" if args.tls else "http"
         identifier = scan(repo, project, f"{scheme}://127.0.0.1:{server.server_port}/", crawl=True,
                           ports=str(server.server_port) if use_nmap else None, ca_bundle=ca_bundle,
-                          nmap_unprivileged=True, nmap_diagnostic=nmap_diagnostic)
+                          **lab_scan_options(scan, nmap_diagnostic))
         snapshot = repo.snapshot(identifier)
         assert snapshot["http"] and snapshot["javascript"] and snapshot["apis"], snapshot["scan"]["warnings"]
         if use_nmap:
