@@ -107,8 +107,8 @@ CDR lookup or arbitrary exploitation workflow is part of this release.
 
 ## License and compatibility
 
-[MIT](LICENSE) applies to this project. Public maintainer name/email is still a
-release blocker. CyberRecon/Go protocol are 0.2.0; `cyberintel-suite` and the
+[MIT](LICENSE) applies to this project. The public maintainer identity and production signing dry-run are verified;
+HTTPS hosting and clean Kali/Parrot desktop lifecycle remain release blockers. CyberRecon/Go protocol are 0.2.0; `cyberintel-suite` and the
 independent CyberIntel compatibility desktop remain 0.1.0. The `cyberintel/`
 package and command are retained. [Legacy usage](docs/CYBERINTEL_USAGE.md) and the
 [future migration plan](docs/COMPATIBILITY_MIGRATION.md) describe that boundary.

@@ -135,3 +135,15 @@ Final security review: [APT_SIGNING_SECURITY_REVIEW.md](APT_SIGNING_SECURITY_REV
 451 Python tests and the Go race suite passed. Protected signing dry-run and
 expanded tamper checks are implemented; real owner-key/GitHub/HTTPS/VM lifecycle
 results remain NOT TESTED or BLOCKED. Production release remains NOT APPROVED.
+
+
+## Verified signing run update (2026-10-08)
+
+Public run37639197830, commit1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8:
+prepare/sign and cleanup PASS; Pages artifact upload, deploy and publish SKIPPED.
+The production signing path, approved fingerprint and repository verification
+succeeded. No public APT, GitHub Pages or GitHub Release publication occurred in
+this run. Its logs/artifact download require authentication; independent inspection
+here is NOT EXECUTED. Earlier non-execution/blocked signing entries are historical.
+New action pins must be exercised by another protected nonpublishing dry-run.
+Overall production decision remains NOT APPROVED pending installed-system gates.

@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-08",
+  "baseline_commit": "1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8",
+  "source_tree_dirty": true,
+  "decision": "NOT APPROVED",
+  "python": "3.14.7",
+  "python_tests": {
+    "status": "PASS",
+    "count": 451,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 69.6,
+    "evidence": "artifacts/final-readiness-20261008/pytest.xml"
+  },
+  "apt_release_tests": {
+    "status": "PASS",
+    "count": 65,
+    "seconds": 5.07
+  },
+  "go_tests": {
+    "status": "PASS",
+    "command": "go test -race ./...",
+    "toolchain": "go1.26.8",
+    "seconds": 1.025
+  },
+  "local_package": {
+    "path": "dist/final-readiness-20261008/cyberrecon_0.2.0-5_all.deb",
+    "sha256": "d98839754b6f3481d0b5a0d249c22c54a74ad82858e0e6741c6f8f87684a0173",
+    "mode": "local staging; not installed or production signed"
+  },
+  "suite_subsets": {
+    "packaging": 24,
+    "gui_related": 5,
+    "workflow_related": 54
+  },
+  "source_gui": {
+    "status": "PASS",
+    "evidence": "artifacts/final-readiness-20261008/desktop/desktop.json",
+    "mode": "live source GUI; installed-system NOT EXECUTED"
+  },
+  "loopback_lab": {
+    "status": "PASS",
+    "scan": "e9dc0386-e07b-4912-8f32-5d1e3cb31e42",
+    "tls_verified": true,
+    "real_nmap": true
+  },
+  "production_run": {
+    "status": "PASS",
+    "run_id": 37639197830,
+    "commit": "1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8"
+  },
+  "current_action_updates_github_execution": "NOT EXECUTED",
+  "kali_installed_lifecycle": "NOT EXECUTED",
+  "parrot_installed_lifecycle": "NOT EXECUTED",
+  "production_artifact_independent_verification": "NOT EXECUTED",
+  "published": false,
+  "credential_scan": {
+    "status": "PASS",
+    "source_files": 156,
+    "local_artifact_files": 1,
+    "remote_artifacts_and_logs": "NOT EXECUTED"
+  },
+  "source_cli": {
+    "status": "PASS",
+    "uid": 1000,
+    "version": "0.2.0",
+    "commands": [
+      "--version",
+      "--help",
+      "--doctor"
+    ],
+    "home": "artifacts/final-readiness-20261008/cli"
+  }
+}

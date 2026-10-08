@@ -296,3 +296,15 @@ A successful real dry-run is evidence for production signing only. Publication s
 requires exact-commit qualification, reviewed clean-tree evidence, HTTPS hosting
 and every existing release gate. The dry-run has not been executed on GitHub here.
 See [final signing security review](APT_SIGNING_SECURITY_REVIEW.md).
+
+
+## Verified production signing milestone (2026-10-08)
+
+[Run37639197830](https://github.com/naresh1807/CyberIntel/actions/runs/37639197830)
+completed on commit1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8: prepare/sign PASS,
+cleanup PASS, Pages upload/deploy/publish SKIPPED. The protected production key
+and fingerprint checks succeeded; no public repository or release was published.
+Earlier NOT TESTED statements describe the earlier sessions. Independent raw-log
+and signed-artifact inspection here remain NOT EXECUTED (authentication required).
+Current local Node24 action updates require a fresh protected signing dry-run.
+No installed OS/HTTPS lifecycle gate is implied by successful signing.

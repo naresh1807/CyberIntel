@@ -1,3 +1,35 @@
+# CyberRecon Production APT Signing Dry Run — verified result
+
+Updated 2026-10-08 (America/New_York). The original non-execution record below
+is preserved as historical evidence and has been superseded by the successful run.
+
+Run: [37639197830](https://github.com/naresh1807/CyberIntel/actions/runs/37639197830).
+Actual commit: 1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8.
+Public GitHub REST job/step metadata independently verified:
+
+- prepare = PASS
+- sign = PASS (production import/fingerprint checks, both signature/hash checks
+  and tamper checks execute in the successful signing step)
+- temporary signing material cleanup = PASS (successful cleanup step)
+- Pages artifact upload = SKIPPED
+- deploy = SKIPPED
+- publish = SKIPPED
+
+Production pin accepted: F1C454E3BB40C77AB236828DCB222DFEAD382DFC.
+The run successfully used the protected signing path. Public APT/Pages and a
+GitHub Release were not published by this run. No secret value is recorded.
+The signed-release artifact exists (ID11528757198); independent download/access
+and raw-log leakage audit in this session are NOT EXECUTED: artifact HTTP401,
+logs HTTP403. Job success is not an independent artifact inspection.
+Evidence: [public run metadata](release-evidence/final-readiness-signing-run.json).
+
+The Node24 action migration in the current local working tree postdates this
+successful run. Its GitHub execution is NOT EXECUTED; a new protected nonpublishing
+dry-run is required after committing/reviewing the action changes. Clean desktop
+installation/lifecycle qualification remains required before production approval.
+
+## Historical report from before the owner's successful run
+
 # CyberRecon Production APT Signing Dry Run
 
 Check date: 2026-10-07 (America/New_York).

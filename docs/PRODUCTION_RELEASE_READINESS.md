@@ -1,3 +1,76 @@
+# CyberRecon v0.2.0 — final production readiness audit
+
+Audit date: 2026-10-08 (America/New_York). Current committed baseline:
+1eb2eb937a743cc66f1c4e71ed6c34f5fdeeccb8; action/documentation changes are local
+and uncommitted. **Production decision: NOT APPROVED — BLOCKED.**
+No production tag, Release, Pages deployment or APT publication was performed.
+
+## Current authoritative gate table
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Python tests | PASS | 451 passed, no failures/skips/xfails, 69.60s; artifacts/final-readiness-20261008/pytest.xml. |
+| APT/release tests | PASS | 65 passed in5.07s; apt-release.xml. Real disposable development signatures, hash chain, wrong-key/unsigned/tamper rejection. |
+| Go tests | PASS | go test -race ./...; official checksum-verified Go1.26.8 in /tmp, DNS worker passed in1.025s. |
+| Production signing dry-run | PASS | [Run37639197830](https://github.com/naresh1807/CyberIntel/actions/runs/37639197830), exact baseline commit: prepare/sign/cleanup success; Pages upload/deploy/publish skipped. Imported production fingerprint and both signature/hash checks executed successfully. |
+| Packaging tests | PASS | Production-identity local all Deb built; verify_cyberrecon_package.py staging, CLI/database, overlay and staged-removal checks. NOT an apt transaction or immutable production artifact. |
+| Source GUI tests | PASS | Live non-root Kali2026.3 XFCE/X11 Qt xcb: rendering/tabs/settings/Doctor/scope/cancellation/reports/graph/close-reopen persistence; desktop/desktop.json. Offscreen startup also passed. |
+| Source CLI (normal user) | PASS | UID1000 --version (0.2.0), --help, --doctor using isolated workspace; cli-help.txt/doctor.json. Installed-system operation remains NOT EXECUTED. |
+| Authorized local scan | PASS | Owned loopback TLS/Nmap lab complete; verified TLS, HTTP4/ports1/APIs2/JavaScript1 and reports. |
+| Kali fresh install | NOT EXECUTED | No disposable privileged Kali desktop VM; production HTTPS APT unavailable. Host untouched. |
+| Kali GUI (installed/menu) | NOT EXECUTED | Source GUI PASS is separate; clean installed desktop/menu/browser handoff missing. |
+| Kali upgrade | NOT EXECUTED | Actual old-to-current apt transaction and all data/report preservation not executed. |
+| Kali reboot | NOT EXECUTED | No disposable VM; host not rebooted. |
+| Kali remove/purge | NOT EXECUTED | No disposable installed-system transaction. |
+| Kali reinstall | NOT EXECUTED | No disposable installed-system transaction. |
+| Parrot fresh install | NOT EXECUTED | No suitable disposable Parrot Security amd64 desktop available. |
+| Parrot GUI | NOT EXECUTED | No required installed desktop/menu environment. |
+| Parrot upgrade | NOT EXECUTED | No actual installed-system upgrade/data preservation. |
+| Parrot reboot | NOT EXECUTED | No suitable disposable environment. |
+| Parrot remove/purge | NOT EXECUTED | No actual installed-system transaction. |
+| Parrot reinstall | NOT EXECUTED | No actual installed-system transaction. |
+| APT signature verification (successful run) | PASS | Protected sign step invokes pinned production verifier for InRelease/Release.gpg, Release/index/package hashes and runtime tamper rejection. |
+| Production artifact independent re-verification | NOT EXECUTED | Signed artifact download HTTP401; raw logs HTTP403. No artifact inspection or remote leakage absence is inferred from job success. |
+| Credential/security scan | PASS | Bounded local scanner:156 source files and1 built Deb; security regressions in451-test suite. Owner secret values never requested. Raw remote log/artifact scan remains NOT EXECUTED. |
+| Workflow/release tests | PASS | Existing test suite, YAML parse, immutable pins, protected Environment, least-privilege and publish-only guards verified locally. |
+| Updated workflow on GitHub | NOT EXECUTED | Node24 pins postdate successful run; another protected publish=false dry-run required. |
+| HTTPS APT/public install | NOT EXECUTED | No qualified public/staging HTTPS install source available in this session; no publication attempted. |
+| Overall production approval | BLOCKED | Mandatory installed Kali/Parrot lifecycle and independent artifact evidence incomplete. |
+
+## Node.js warning remediation
+
+Official action.yml manifests, not release-note claims alone, were inspected.
+Node24 pins: checkout5.1.0, setup-python6.3.0, setup-go6.5.0,
+upload-artifact7.0.2, download-artifact8.0.2 and deploy-pages5.0.1.
+Upload-pages-artifact5.0.0 is composite and pins its nested Node24 uploader.
+Older artifact releases claimed Node24 in notes but still declared Node20 in their
+pinned manifests, so those were not selected. Existing artifact name/path/archive
+and extraction inputs remain supported. Permissions, protected Environment,
+manual/main-only trigger, qualification gates and publish=false behavior remain.
+Official releases and exact immutable SHAs: [pin evidence](release-evidence/node24-action-pins.json).
+The hosted Ubuntu24.04 runner is retained; any self-hosted runner must meet the
+actions' Node24 runner requirements. Local tests do not certify runner execution.
+
+## Evidence limits and next qualification
+
+Public job/step evidence: [successful signing run](release-evidence/final-readiness-signing-run.json).
+Measured local results: [final audit evidence](release-evidence/final-readiness-20261008.json).
+Historical reports below are preserved and superseded by the current table.
+The actual normal-user source CLI/GUI and staged package checks are distinct
+from installed OS qualification. No unrelated user files were deleted.
+
+Next: review/commit the action changes and run the protected workflow on that new
+SHA with signing_dry_run=true, publish=false, refresh_only=false. Inspect/download
+its public signed artifacts privately with owner authentication and independently
+verify the exact production fingerprint, both signatures, hashes, tamper rejection,
+logs/artifact credential absence and cleanup. Then qualify actual staging signed
+APT and desktop/lifecycle behavior on disposable Kali and Parrot amd64 VMs using
+only owned local targets. Do not publish during these checks. Production publication
+still requires reviewed exact-commit qualification with every mandatory gate PASS.
+No private key/passphrase should be sent to chat, Git or diagnostic uploads.
+
+## Historical readiness report (superseded)
+
 # CyberRecon v0.2.0 production release readiness
 
 Signing setup baseline: `fddfafc`. APT phase baseline: `c1cdeb4`. Previous final-gate baseline: `c1fafb8`. This phase includes uncommitted signing setup

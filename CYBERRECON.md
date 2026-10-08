@@ -54,7 +54,8 @@ APT metadata expires after seven days and must be regenerated and re-signed for 
 
 `python scripts/verify_cyberrecon_lab.py --tls` starts an ephemeral loopback TLS service, verifies native discovery/certificate metadata, scans that script-owned port with real Nmap when available, and generates reports under ignored `artifacts/`. Its temporary certificate key is discarded. No external targets are contacted. CI runs the Go race tests and this local TLS/Nmap check.
 
-See [release qualification](docs/RELEASE_QUALIFICATION.md) for measured Kali/Parrot package lifecycle checks and exact image digests. These checks do not certify a graphical desktop VM or a production APT repository. MIT is selected. Operator identity and public hosting remain release blockers.
+See [release qualification](docs/RELEASE_QUALIFICATION.md) for measured Kali/Parrot package lifecycle checks and exact image digests. These checks do not certify a graphical desktop VM or a production APT repository. MIT is selected. The owner-supplied public identity and production signing dry-run are now verified;
+public hosting and clean desktop lifecycle qualification remain release blockers.
 
 The clean-image path qualified locally uses `--no-install-recommends` for APT
 dependency resolution. Default recommendations pull additional system packages
