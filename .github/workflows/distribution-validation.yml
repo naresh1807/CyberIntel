@@ -48,7 +48,7 @@ jobs:
           .venv/bin/python -c 'import sys, PySide6; from PySide6 import QtWidgets; print(sys.version); print("PySide6", PySide6.__version__); print("QtWidgets import: PASS")'
           .venv/bin/python -m pytest -q
           .venv/bin/python scripts/verify_cyberrecon_startup.py
-          .venv/bin/python scripts/verify_cyberrecon_lab.py --tls
+          .venv/bin/python scripts/verify_cyberrecon_lab.py --tls --require-nmap
       - name: Go race tests
         working-directory: workers/dns
         run: go test -race ./...

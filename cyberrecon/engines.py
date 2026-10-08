@@ -28,7 +28,7 @@ class ToolError(ValidationError):
         super().__init__(f"{self.tool}: {code}; check Doctor, configuration and permissions.")
 
 
-def run_process(args, input_bytes=None, timeout=120, cancel=None, output_paths=(), max_output=16 * 1024 * 1024, combine_stderr=False):
+def run_process(args, input_bytes=None, timeout=120, cancel=None, output_paths=(), max_output=16 * 1024 * 1024, combine_stderr=False, diagnostic=None):
     if not isinstance(args, (list, tuple)) or not args or len(args) > 1024 or any(not isinstance(arg, str) or len(arg) > 8192 or "\x00" in arg for arg in args):
         raise ValidationError("Command must be a nonempty text argument array.")
     if not 0 < timeout <= 600 or not 0 < max_output <= 16 * 1024 * 1024:
@@ -53,6 +53,13 @@ def run_process(args, input_bytes=None, timeout=120, cancel=None, output_paths=(
             raise ToolError("permission_denied", args[0]) from None
         except OSError:
             raise ToolError("tool_failed", args[0]) from None
+        def diagnose():
+            if diagnostic is not None:
+                output.seek(0)
+                errors.seek(0)
+                diagnostic({"command": [executable, *args[1:]], "returncode": process.returncode,
+                            "stdout": output.read(8192).decode("utf-8", errors="replace"),
+                            "stderr": errors.read(8192).decode("utf-8", errors="replace")})
         def stop():
             try:
                 if os.name == "posix":
@@ -76,10 +83,12 @@ def run_process(args, input_bytes=None, timeout=120, cancel=None, output_paths=(
                         "output_limit" if oversized() else None)
                 if code:
                     stop()
+                    diagnose()
                     raise ToolError(code, args[0])
                 time.sleep(.05)
             if oversized():
                 raise ToolError("output_limit", args[0])
+            diagnose()
             if process.returncode:
                 raise ToolError("tool_failed", args[0])
             output.seek(0)
@@ -137,20 +146,24 @@ def passive_domains(engine, target, scope, cancel=None):
     return sorted(names), raw
 
 
-def port_scan(target, scope, ports="", udp=False, cancel=None):
+def port_scan(target, scope, ports="", udp=False, cancel=None, *, unprivileged=False, diagnostic=None):
     scope.require(target)
     # Strict IP-only target; DNS resolution never implicitly authorizes Nmap.
     args, addresses = scan_arguments(target, ports)
     for address in addresses:
         scope.require(address)
     args += ["--max-rate", "2", "--max-parallelism", "2"]
+    if unprivileged:
+        if udp:
+            raise ValidationError("Unprivileged lab mode supports TCP only.")
+        args.insert(0, "--unprivileged")
     if udp:
         args[args.index("-sT")] = "-sU"
         if os.name == "posix" and os.geteuid() != 0:
             raise ValidationError("UDP Nmap requires appropriate privileges; CyberRecon does not elevate itself.")
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "nmap.xml"
-        run_process(["nmap", *args, "-oX", str(output), *addresses], timeout=180, cancel=cancel, output_paths=(output,))
+        run_process(["nmap", *args, "-oX", str(output), *addresses], timeout=180, cancel=cancel, output_paths=(output,), **({"diagnostic": diagnostic} if diagnostic is not None else {}))
         if not output.exists() or output.stat().st_size > 16 * 1024 * 1024:
             raise ValidationError("Nmap output missing or oversized.")
         payload = output.read_bytes()

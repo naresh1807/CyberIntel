@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise native collection and real Nmap against this script's loopback server."""
 import argparse
+import os
+import re
 import json
 import shutil
 import ssl
@@ -93,9 +95,25 @@ def main():
         project = repo.create_project("Synthetic local lab", ["127.0.0.1"],
                                      authority="Loopback service created and owned by this verification script")
         use_nmap = not args.no_nmap and bool(shutil.which("nmap"))
+        nmap_diagnostic = None
+        if use_nmap:
+            from cyberrecon.doctor import tool_status
+            capabilities = []
+            status = Path("/proc/self/status")
+            if status.is_file():
+                capabilities = [line for line in status.read_text().splitlines() if line.startswith(("CapEff:", "CapBnd:", "NoNewPrivs:"))]
+            print(json.dumps({"nmap": tool_status("nmap", "Local TCP fixture"),
+                              "effective_uid": os.geteuid() if hasattr(os, "geteuid") else None,
+                              "capabilities": capabilities, "mode": "unprivileged TCP-connect; owned loopback only"}), flush=True)
+            def nmap_diagnostic(record):
+                # Only this script's fixed loopback fixture is logged; never env/key material.
+                for name in ("stdout", "stderr"):
+                    record[name] = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", record[name])
+                print(json.dumps({"local_nmap_process": record}), flush=True)
         scheme = "https" if args.tls else "http"
         identifier = scan(repo, project, f"{scheme}://127.0.0.1:{server.server_port}/", crawl=True,
-                          ports=str(server.server_port) if use_nmap else None, ca_bundle=ca_bundle)
+                          ports=str(server.server_port) if use_nmap else None, ca_bundle=ca_bundle,
+                          nmap_unprivileged=True, nmap_diagnostic=nmap_diagnostic)
         snapshot = repo.snapshot(identifier)
         assert snapshot["http"] and snapshot["javascript"] and snapshot["apis"], snapshot["scan"]["warnings"]
         if use_nmap:

@@ -32,7 +32,7 @@ class Links(HTMLParser):
 
 
 def scan(repository, project, target, passive=None, crawl=False, history=None,
-         ports=None, udp=False, transport=None, cancel=None, lifecycle=False, go_dns=False, words=None, cve=False, progress=None, ca_bundle=None):
+         ports=None, udp=False, transport=None, cancel=None, lifecycle=False, go_dns=False, words=None, cve=False, progress=None, ca_bundle=None, nmap_unprivileged=False, nmap_diagnostic=None):
     cancel = cancel or threading.Event()
     words = list(dict.fromkeys(word.strip().lstrip("/") for word in words or [] if word.strip()))
     if len(words) > 200 or any(not re.fullmatch(r"[a-zA-Z0-9_./-]{1,100}", word) or ".." in word for word in words):
@@ -278,7 +278,7 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
         if ports is not None and not cancel.is_set():
             progress("Nmap service inventory: " + root)
             try:
-                records, raw = engines.port_scan(root, scope(), ports, udp, cancel)
+                records, raw = engines.port_scan(root, scope(), ports, udp, cancel, **({"unprivileged": True} if nmap_unprivileged else {}), **({"diagnostic": nmap_diagnostic} if nmap_diagnostic is not None else {}))
                 evidence = repository.evidence(identifier, "nmap.xml", raw)
             except Exception as exc:
                 warn("Nmap unavailable or incomplete", exc)
