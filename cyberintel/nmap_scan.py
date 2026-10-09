@@ -65,6 +65,8 @@ def parse_scan(payload):
         address = ", ".join(addresses)
         hosts.append({"ip": address, "status": host.find("status").get("state", "unknown") if host.find("status") is not None else "unknown",
                       "timed_out": host.get("timedout") == "true",
+                      "timing": {key: host.get(key) for key in ("starttime", "endtime") if host.get(key)},
+                      "os_matches": [item.attrib for item in host.findall("os/osmatch")],
                       "port_summary": [item.attrib for item in host.findall("ports/extraports")]})
         for port in host.findall("ports/port"):
             try:
@@ -85,7 +87,7 @@ def parse_scan(payload):
                             "confidence": attrs.get("conf", ""), "detection_method": attrs.get("method", ""),
                             "cpe": [item.text for item in service.findall("cpe")] if service is not None else [],
                             "script_findings": scripts})
-    return {"records": records, "hosts": hosts, "nmap_version": root.get("version", ""),
+    return {"records": records, "hosts": hosts, "nmap_version": root.get("version", ""), "completion": dict(finished.attrib),
             "note": "Service versions and OS hints are observations, not proof. Vulners matches are potential vulnerabilities requiring validation; no matches does not establish safety. Host timeouts can leave incomplete results. UDP and full OS fingerprinting are not included."}
 
 

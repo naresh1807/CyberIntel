@@ -10,6 +10,7 @@ from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlsplit
 from pathlib import Path
 
+import dns.reversename
 import dns.resolver
 import httpx
 
@@ -24,11 +25,26 @@ class Links(HTMLParser):
     def __init__(self):
         super().__init__()
         self.links = []
+        self.title = ""
+        self.in_title = False
+        self.generator = ""
 
     def handle_starttag(self, tag, attrs):
+        self.in_title = self.in_title or tag == "title"
+        attributes = dict(attrs)
+        if tag == "meta" and attributes.get("name", "").lower() == "generator":
+            self.generator = (attributes.get("content") or "")[:256]
         for name, value in attrs:
             if value and (name == "href" or tag == "script" and name == "src" or tag == "form" and name == "action"):
                 self.links.append((value, tag))
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.in_title = False
+
+    def handle_data(self, data):
+        if self.in_title:
+            self.title = (self.title + data)[:512]
 
 
 def scan(repository, project, target, passive=None, crawl=False, history=None,
@@ -54,7 +70,7 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
         verification = ssl.create_default_context()
         verification.load_verify_locations(cadata=data.decode("ascii"))
         ca_digest = hashlib.sha256(data).hexdigest()
-    settings = dict(passive=passive, crawl=crawl, history=history, ports=ports, udp=udp,
+    settings = dict(passive=passive, crawl=crawl, history=history, ports=ports, udp=udp, nmap_unprivileged=nmap_unprivileged,
                     max_pages=30, max_hosts=30, requests=100, rate=2, lifecycle=lifecycle, go_dns=go_dns, content_paths=words, cve=cve, ca_bundle_sha256=ca_digest)
     identifier = repository.start_scan(project, target, settings)
     warnings = []
@@ -129,6 +145,20 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                 literal_ip = True
             except ValueError:
                 literal_ip = False
+            if transport is None and literal_ip and not cancel.is_set():
+                try:
+                    scope().require(host)
+                    resolver = dns.resolver.Resolver()
+                    resolver.lifetime = 3
+                    answer = resolver.resolve(dns.reversename.from_address(host), "PTR", search=False)
+                    for entry in answer:
+                        value = str(entry).rstrip(".")
+                        save("dns", dns_key(host, "PTR", value), {"host": host, "type": "PTR", "value": value,
+                             "ttl": answer.rrset.ttl, "authorization": "Discovered name is not automatically authorized"}, "DNS resolver")
+                except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+                    pass
+                except Exception as exc:
+                    warn("Reverse DNS " + host, exc)
             if transport is None and not literal_ip:
                 resolver = dns.resolver.Resolver()
                 resolver.lifetime = 3
@@ -155,6 +185,8 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                         warn(f"DNS {host} {family}", exc)
             initial = clean_url(target) if "://" in target and host == root else "https://" + (f"[{host}]" if ":" in host else host) + "/"
             queue, seen = deque([(initial, 0)]), set()
+            if crawl:
+                queue.extend((clean_url(path, initial), 1) for path in ("/robots.txt", "/sitemap.xml"))
             baseline = None
             if words and not cancel.is_set():
                 try:
@@ -221,6 +253,22 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                                          "HTTP configuration review", confidence="requires-validation")
                         parser = Links()
                         parser.feed(body)
+                        save("http", result["url"], {**result, "title": parser.title.strip(),
+                             "generator": parser.generator}, "scoped HTTP")
+                        if parser.generator:
+                            save("technologies", result["url"] + ":generator", {"banner": parser.generator,
+                                 "url": result["url"], "evidence_sha256": result["body_sha256"],
+                                 "verified_version": False}, "HTML generator metadata", confidence="self-reported")
+                        for value, tag in parser.links[:200]:
+                            if tag != "script":
+                                continue
+                            path = urlsplit(value).path.lower()
+                            for library in ("jquery", "react", "vue", "angular", "bootstrap"):
+                                if re.search(r"(?:^|[/._-])" + library + r"(?:[./_-]|$)", path):
+                                    save("technologies", result["url"] + ":script:" + library,
+                                         {"technology": library, "url": result["url"], "verified_version": False,
+                                          "evidence": "Linked script filename indicator", "evidence_sha256": result["body_sha256"]},
+                                         "HTML script link", confidence="candidate")
                         candidates = parser.links
                     elif "javascript" in result["headers"].get("content-type", "").lower() or urlsplit(url).path.lower().endswith(".js"):
                         maps = []
@@ -294,6 +342,8 @@ def scan(repository, project, target, passive=None, crawl=False, history=None,
                          "cpe": row["cpe"], "lifecycle": "UNKNOWN", "note": "Validate version and distribution backports before assessing CVEs."}, "Nmap", confidence="engine-observed")
                     edge("service:" + key + ":" + row["service"], "technology:" + key, "reports")
             for row in records["hosts"]:
+                save("assets", row["ip"], {"host": row["ip"], "nmap_host": row,
+                     "nmap_version": records.get("nmap_version"), "nmap_completion": records.get("completion"), "evidence": evidence}, "Nmap")
                 if row["timed_out"]:
                     warn("Nmap host timed out; port inventory may be incomplete: " + row["ip"])
         if not hosts:

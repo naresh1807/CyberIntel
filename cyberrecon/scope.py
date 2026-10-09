@@ -10,8 +10,13 @@ def host_of(value):
     if not isinstance(value, str) or len(value) > 4096 or any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ValidationError("Invalid target text or control characters.")
     value = value.strip()
+    if not value or any(c.isspace() for c in value) or "\\" in value:
+        raise ValidationError("Enter a domain, IP, or HTTP(S) URL without spaces or backslashes.")
     if "://" in value:
-        parts = urlsplit(value)
+        try:
+            parts = urlsplit(value)
+        except ValueError:
+            raise ValidationError("Invalid target URL or IPv6 brackets.") from None
         if parts.scheme not in {"http", "https"} or parts.username or parts.password or not parts.hostname:
             raise ValidationError("Use an HTTP(S) target without credentials.")
         try:
